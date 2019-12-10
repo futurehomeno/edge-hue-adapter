@@ -1,0 +1,31 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]
+then
+  groupadd -r futurehome || true
+  groupadd -r hue-ad || true
+
+  useradd -r -N -M -d / -s /bin/false -g hue-ad hue-ad || true
+
+  chown -R hue-ad:futurehome /var/log/futurehome/hue-ad/ || true
+  chown -R hue-ad:hue-ad /var/lib/futurehome/hue-ad/ || true
+fi
+
+deb-systemd-helper unmask hue-ad.service >/dev/null || true
+
+if deb-systemd-helper --quiet was-enabled hue-ad.service; then
+  deb-systemd-helper enable hue-ad.service >/dev/null || true
+else
+  deb-systemd-helper update-state hue-ad.service >/dev/null || true
+fi
+
+if [ -d /run/systemd/system ]; then
+  systemctl --system daemon-reload >/dev/null || true
+
+  if [ -n "$2" ]; then
+    deb-systemd-invoke try-restart hue-ad.service >/dev/null || true
+  else
+    deb-systemd-invoke start hue-ad.service >/dev/null || true
+  fi
+fi

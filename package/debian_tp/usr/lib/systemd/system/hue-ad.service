@@ -1,0 +1,14 @@
+[Unit]
+Description=hue-ad
+
+[Service]
+Type=simple
+ExecStart=/opt/thingsplex/hue-ad/hue-ad -c config.json
+User=hue-ad
+WorkingDirectory=/opt/thingsplex/hue-ad
+Restart=always
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target
