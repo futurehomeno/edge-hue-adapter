@@ -46,13 +46,25 @@ func (ns *NetworkService) DeleteThing(deviceId string) error {
 }
 
 func (ns *NetworkService) SendInclusionReport(nodeId string) error {
-	nodeId = strings.Replace(nodeId,"l","",1)
-	deviceId , err:= strconv.Atoi(nodeId)
-	if err != nil {
-		return err
+	var deviceId int
+	var deviceType string
+	var err error
+	if strings.Contains(nodeId,"l"){
+		nodeId = strings.Replace(nodeId,"l","",1)
+		deviceId , err= strconv.Atoi(nodeId)
+		if err != nil {
+			return err
+		}
+		deviceType = "lights"
+	}else {
+		nodeId = strings.Replace(nodeId,"s","",1)
+		deviceId , err= strconv.Atoi(nodeId)
+		if err != nil {
+			return err
+		}
+		deviceType = "sensors"
 	}
 
-	deviceType := "lights"
 
 	var productId,name, manufacturer, powerSource, swVersion, serialNr string
 	var deviceAddr string
@@ -247,7 +259,6 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 
 	if deviceType == "lights" {
 		    l,_ := (*ns.bridge).GetLight(deviceId)
-			// All good
 			productId = l.ProductID
 			manufacturer = l.ManufacturerName
 			swVersion = l.SwVersion
@@ -259,8 +270,25 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 			colorService.Address = colorService.Address+serviceAddres
 			services = append(services,outLvlSwitchService,sceneService,colorService)
 		    deviceAddr = fmt.Sprintf("l%d",deviceId)
+			powerSource = "ac"
+		}else if deviceType == "sensors" {
+			l,_ := (*ns.bridge).GetSensor(deviceId)
+			if l.Type != "ZLLSwitch" {
+				return nil
+			}
+			productId = l.ModelID
+			manufacturer = l.ManufacturerName
+			swVersion = l.SwVersion
+			serialNr = l.UniqueID
+			name = l.Name
+			serviceAddres := fmt.Sprintf("s%d_0",deviceId)
+			sceneService.Props["sup_scenes"] = []string{}
+			sceneService.Address = sceneService.Address+serviceAddres
+			services = append(services,sceneService)
+			deviceAddr = fmt.Sprintf("s%d",deviceId)
+			powerSource = "battery"
 		}
-		powerSource = "ac"
+
 
 
 	//}

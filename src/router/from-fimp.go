@@ -22,25 +22,25 @@ type FromFimpRouter struct {
 	configs            *model.Configs
 	bridge             **huego.Bridge
 	netService         *model.NetworkService
+	stateMonitor       *StateMonitor
 	isInclusionRunning bool
 }
 
-func NewFromFimpRouter(mqt *fimpgo.MqttTransport, appLifecycle *model.Lifecycle, configs *model.Configs, bridge **huego.Bridge) *FromFimpRouter {
-	fc := FromFimpRouter{inboundMsgCh: make(fimpgo.MessageCh, 5), mqt: mqt, appLifecycle: appLifecycle, configs: configs, bridge: bridge}
+func NewFromFimpRouter(mqt *fimpgo.MqttTransport, appLifecycle *model.Lifecycle, configs *model.Configs, bridge **huego.Bridge,monitor *StateMonitor) *FromFimpRouter {
+	fc := FromFimpRouter{inboundMsgCh: make(fimpgo.MessageCh, 5), mqt: mqt, appLifecycle: appLifecycle, configs: configs, bridge: bridge,stateMonitor:monitor}
 	fc.netService = model.NewNetworkService(mqt, bridge)
 	fc.mqt.RegisterChannel("ch1", fc.inboundMsgCh)
 	return &fc
 }
 
 func (fc *FromFimpRouter) Start() {
-	fc.mqt.Subscribe("pt:j1/+/rt:dev/rn:hue/ad:1/#")
-	fc.mqt.Subscribe("pt:j1/+/rt:ad/rn:hue/ad:1")
+	fc.mqt.Subscribe("pt:j1/mt:cmd/rt:dev/rn:hue/ad:1/#")
+	fc.mqt.Subscribe("pt:j1/mt:cmd/rt:ad/rn:hue/ad:1")
 	go func(msgChan fimpgo.MessageCh) {
 		for {
 			select {
 			case newMsg := <-msgChan:
 				fc.routeFimpMessage(newMsg)
-
 			}
 		}
 
@@ -192,6 +192,14 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				fc.netService.SendInclusionReport(fmt.Sprintf("l%d", l.ID))
 			}
 
+			sensors , err := (*fc.bridge).GetSensors()
+			if err != nil {
+				return
+			}
+			for _, l := range sensors {
+				fc.netService.SendInclusionReport(fmt.Sprintf("s%d", l.ID))
+			}
+
 		case "cmd.system.get_connect_params":
 			br,_ := huego.DiscoverAll()
 			var discoverdIds , discoveredIps,bridgeId string
@@ -277,6 +285,15 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				for _, l := range lights {
 					fc.netService.SendInclusionReport(fmt.Sprintf("l%d", l.ID))
 				}
+
+				sensors, err := (*fc.bridge).GetSensors()
+				if err != nil {
+					return
+				}
+				for _, l := range sensors {
+					fc.netService.SendInclusionReport(fmt.Sprintf("s%d", l.ID))
+				}
+
 			}
 
 		case "cmd.network.get_all_nodes":

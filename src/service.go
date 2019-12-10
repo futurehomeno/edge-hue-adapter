@@ -67,8 +67,13 @@ func main() {
 	var bridge **huego.Bridge
 	b := &huego.Bridge{}
 	bridge = &b
-	fimpRouter := router.NewFromFimpRouter(mqtt,appLifecycle,configs,bridge)
+
+	stateMonitor := router.NewStateMonitor(mqtt,bridge,configs.InstanceAddress)
+    stateMonitor.SetPoolingInterval(configs.StatePoolingInterval)
+	fimpRouter := router.NewFromFimpRouter(mqtt,appLifecycle,configs,bridge,stateMonitor)
 	fimpRouter.Start()
+
+
 
 	if configs.IsConfigured() && err == nil {
 		appLifecycle.PublishEvent(model.EventConfigured,"service",nil)
@@ -89,6 +94,7 @@ func main() {
 			if (*bridge).ID != "" {
 				log.Infof("Bridge discovered on address = %s , id = %s", (*bridge).Host,(*bridge).ID)
 				(*bridge).Login(configs.Token)
+				stateMonitor.Start()
 			}else {
 				log.Info("Adapter is not configured")
 				appLifecycle.PublishEvent(model.EventConfiguring, "main", nil)

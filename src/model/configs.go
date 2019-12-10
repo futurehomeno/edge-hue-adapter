@@ -15,11 +15,13 @@ type Configs struct {
 	MqttClientIdPrefix    string `json:"mqtt_client_id_prefix"`
 	Token                 string `json:"token"`
 	BridgeId              string `json:"bridge_id"`
+	StatePoolingInterval  time.Duration `json:"state_pooling_interval"`
 	LogFile               string `json:"log_file"`
 	LogLevel              string `json:"log_level"`
 	LogFormat             string `json:"log_format"`
 	ConfiguredAt          string `json:"configured_at"`
 	ConfiguredBy          string `json:"configured_by"`
+
 }
 
 func NewConfigs(path string) *Configs {
@@ -35,6 +37,9 @@ func (cf * Configs) LoadFromFile() error {
 	err = json.Unmarshal(configFileBody, cf)
 	if err != nil {
 		return err
+	}
+	if cf.StatePoolingInterval == 0 {
+		cf.StatePoolingInterval = 1
 	}
 	return nil
 }
@@ -57,6 +62,7 @@ func (cf *Configs) InitDefault() {
 	cf.LogFile = "/var/log/thingsplex/hue-ad/hue-ad.log"
 	cf.LogLevel = "info"
 	cf.LogFormat = "text"
+	cf.StatePoolingInterval = 1
 }
 
 func (cf *Configs) IsConfigured()bool {
