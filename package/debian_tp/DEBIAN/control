@@ -1,5 +1,5 @@
 Package: hue-ad
-Version: 0.1.2
+Version: 0.1.3
 Replaces: hue-ad
 Section: non-free/misc
 Priority: optional

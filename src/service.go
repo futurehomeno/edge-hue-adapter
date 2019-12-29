@@ -78,14 +78,26 @@ func main() {
 	if configs.IsConfigured() && err == nil {
 		appLifecycle.PublishEvent(model.EventConfigured,"service",nil)
 	}
-
+    var br []huego.Bridge
+	var retryCounter int
 	for {
 		appLifecycle.WaitForState("main", model.StateRunning)
-		br , err := huego.DiscoverAll()
-		if err != nil {
-			log.Error("Can't discover the bridge ",err)
-			appLifecycle.PublishEvent(model.EventConfiguring, "main", nil)
-		}else {
+		retryCounter = 0
+		for {
+			br , err = huego.DiscoverAll()
+			if err == nil {
+				break
+			}else {
+				log.Error("Can't discover the bridge. retrying... ",err)
+				retryCounter++
+				if retryCounter > 3 {
+					break
+				}
+				time.Sleep(time.Second*5)
+			}
+		}
+
+		if err == nil {
 			for _,b := range br {
 				if b.ID == configs.BridgeId {
 					*bridge = &b
@@ -99,6 +111,8 @@ func main() {
 				log.Info("Adapter is not configured")
 				appLifecycle.PublishEvent(model.EventConfiguring, "main", nil)
 			}
+		}else {
+
 		}
 		appLifecycle.WaitForState("main", model.StateConfiguring)
 	}

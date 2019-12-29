@@ -62,6 +62,14 @@ func (st *StateMonitor) monitor() {
 						st.sendButtonReport(buttonEventCode,sensors[i].ID)
 					}
 				  }
+				  presenceEvent, butOk := sensors[i].State["presence"]
+				  if butOk {
+					  presenceState,ok := presenceEvent.(bool)
+					  if ok {
+						  //log.Debugf("Sensor name = %s , type = %s , state = %+v , config = %+v",sensors[i].Name,sensors[i].Type,sensors[i].State,sensors[i].Config)
+						  st.sendPresenceReport(presenceState,sensors[i].ID)
+					  }
+				  }
 				  //log.Debugf("%+v",sensors[i])
 				  st.sensorStates[sensors[i].ID] = sensors[i]
 			  }
@@ -93,6 +101,13 @@ func (st *StateMonitor) sendButtonReport(code float64,deviceId int) {
 	servAddr := fmt.Sprintf("s%d_0",deviceId)
 	msg := fimpgo.NewStringMessage("evt.scene.report", "scene_ctrl", valS, nil, nil, nil)
 	adr := &fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeDevice, ResourceName: "hue", ResourceAddress: st.instanceId, ServiceName: "scene_ctrl", ServiceAddress: servAddr}
+	st.mqt.Publish(adr,msg)
+}
+
+func (st *StateMonitor) sendPresenceReport(state bool,deviceId int) {
+	servAddr := fmt.Sprintf("s%d_0",deviceId)
+	msg := fimpgo.NewBoolMessage("evt.presence.report", "sensor_presence", state, nil, nil, nil)
+	adr := &fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeDevice, ResourceName: "hue", ResourceAddress: st.instanceId, ServiceName: "sensor_presence", ServiceAddress: servAddr}
 	st.mqt.Publish(adr,msg)
 }
 

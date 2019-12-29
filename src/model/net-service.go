@@ -120,17 +120,17 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 	//}}
 	//
 	//
-	//presenceSensorInterfaces := []fimptype.Interface{{
-	//	Type:      "in",
-	//	MsgType:   "cmd.presence.get_report",
-	//	ValueType: "null",
-	//	Version:   "1",
-	//}, {
-	//	Type:      "out",
-	//	MsgType:   "evt.presence.report",
-	//	ValueType: "bool",
-	//	Version:   "1",
-	//}}
+	presenceSensorInterfaces := []fimptype.Interface{{
+		Type:      "in",
+		MsgType:   "cmd.presence.get_report",
+		ValueType: "null",
+		Version:   "1",
+	}, {
+		Type:      "out",
+		MsgType:   "evt.presence.report",
+		ValueType: "bool",
+		Version:   "1",
+	}}
 	//
 	//contactSensorInterfaces := []fimptype.Interface{{
 	//	Type:      "in",
@@ -245,17 +245,17 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 	//	Interfaces:       contactSensorInterfaces,
 	//}
 
-	//presenceService := fimptype.Service{
-	//	Name:    "sensor_presence",
-	//	Alias:   "Door/window contact",
-	//	Address: "/rt:dev/rn:hue/ad:1/sv:sensor_presence/ad:",
-	//	Enabled: true,
-	//	Groups:  []string{"ch_0"},
-	//	Props: map[string]interface{}{},
-	//	Tags:             nil,
-	//	PropSetReference: "",
-	//	Interfaces:       presenceSensorInterfaces,
-	//}
+	presenceService := fimptype.Service{
+		Name:    "sensor_presence",
+		Alias:   "Motion sensor",
+		Address: "/rt:dev/rn:hue/ad:1/sv:sensor_presence/ad:",
+		Enabled: true,
+		Groups:  []string{"ch_0"},
+		Props: map[string]interface{}{},
+		Tags:             nil,
+		PropSetReference: "",
+		Interfaces:       presenceSensorInterfaces,
+	}
 
 	if deviceType == "lights" {
 		    l,_ := (*ns.bridge).GetLight(deviceId)
@@ -273,9 +273,6 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 			powerSource = "ac"
 		}else if deviceType == "sensors" {
 			l,_ := (*ns.bridge).GetSensor(deviceId)
-			if l.Type != "ZLLSwitch" {
-				return nil
-			}
 			productId = l.ModelID
 			manufacturer = l.ManufacturerName
 			swVersion = l.SwVersion
@@ -284,7 +281,12 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 			serviceAddres := fmt.Sprintf("s%d_0",deviceId)
 			sceneService.Props["sup_scenes"] = []string{}
 			sceneService.Address = sceneService.Address+serviceAddres
-			services = append(services,sceneService)
+			if l.Type == "ZLLSwitch" {
+				services = append(services,sceneService)
+			}
+			if l.Type == "ZLLPresence" {
+				services = append(services,presenceService)
+			}
 			deviceAddr = fmt.Sprintf("s%d",deviceId)
 			powerSource = "battery"
 		}
