@@ -278,13 +278,15 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 			swVersion = l.SwVersion
 			serialNr = l.UniqueID
 			name = l.Name
-			serviceAddres := fmt.Sprintf("s%d_0",deviceId)
-			sceneService.Props["sup_scenes"] = []string{}
-			sceneService.Address = sceneService.Address+serviceAddres
+			serviceAddress := fmt.Sprintf("s%d_0",deviceId)
+
 			if l.Type == "ZLLSwitch" {
+				sceneService.Props["sup_scenes"] = []string{}
+				sceneService.Address = sceneService.Address+ serviceAddress
 				services = append(services,sceneService)
 			}
 			if l.Type == "ZLLPresence" {
+				presenceService.Address = presenceService.Address+ serviceAddress
 				services = append(services,presenceService)
 			}
 			deviceAddr = fmt.Sprintf("s%d",deviceId)
