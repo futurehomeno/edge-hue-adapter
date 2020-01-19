@@ -72,6 +72,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 		case "cmd.binary.set":
 		   if val {
 				state := huego.State{On: true,TransitionTime:transitionTime}
+
 				_, err := (*fc.bridge).SetLightState(addrNum, state)
 				if err != nil {
 					return
@@ -221,6 +222,19 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			}
 		case "cmd.config.set":
 			fallthrough
+		case "cmd.log.set_level":
+			level , err :=newMsg.Payload.GetStringValue()
+			if err != nil {
+				return
+			}
+			logLevel, err := log.ParseLevel(level)
+			if err == nil {
+				log.SetLevel(logLevel)
+			}
+			fc.configs.LogLevel = level
+			fc.configs.SaveToFile()
+			log.Info("Log level updated")
+
 		case "cmd.system.connect":
 			reqVal, err := newMsg.Payload.GetStrMapValue()
 			var errStr string
