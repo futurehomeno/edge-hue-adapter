@@ -24,10 +24,15 @@ type OpResponse struct {
 type NetworkService struct {
 	mqt          *fimpgo.MqttTransport
 	bridge       **huego.Bridge
+	dimmerMaxVal int
+}
+
+func (ns *NetworkService) SetDimmerMaxVal(dimmerMaxVal int) {
+	ns.dimmerMaxVal = dimmerMaxVal
 }
 
 func NewNetworkService(mqt *fimpgo.MqttTransport, bridge  **huego.Bridge) *NetworkService {
-	return &NetworkService{mqt: mqt, bridge:bridge}
+	return &NetworkService{mqt: mqt, bridge:bridge, dimmerMaxVal:255}
 }
 
 func (ns *NetworkService) OpenNetwork(open bool) error {
@@ -199,7 +204,7 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 		Enabled: true,
 		Groups:  []string{"ch_0"},
 		Props: map[string]interface{}{
-			"max_lvl": 255,
+			"max_lvl": ns.dimmerMaxVal,
 			"min_lvl": 0,
 		},
 		Tags:             nil,

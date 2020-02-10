@@ -90,10 +90,10 @@ func main() {
 			}else {
 				log.Error("Can't discover the bridge. retrying... ",err)
 				retryCounter++
-				if retryCounter > 3 {
+				if retryCounter > 10 {
 					break
 				}
-				time.Sleep(time.Second*5)
+				time.Sleep(time.Second*5*time.Duration(retryCounter))
 			}
 		}
 

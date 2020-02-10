@@ -7,20 +7,22 @@ import (
 )
 
 type Configs struct {
-	path                  string
-	InstanceAddress       string `json:"instance_address"`
-	MqttServerURI         string `json:"mqtt_server_uri"`
-	MqttUsername          string `json:"mqtt_server_username"`
-	MqttPassword          string `json:"mqtt_server_password"`
-	MqttClientIdPrefix    string `json:"mqtt_client_id_prefix"`
-	Token                 string `json:"token"`
-	BridgeId              string `json:"bridge_id"`
-	StatePoolingInterval  time.Duration `json:"state_pooling_interval"`
-	LogFile               string `json:"log_file"`
-	LogLevel              string `json:"log_level"`
-	LogFormat             string `json:"log_format"`
-	ConfiguredAt          string `json:"configured_at"`
-	ConfiguredBy          string `json:"configured_by"`
+	path                 string
+	InstanceAddress      string        `json:"instance_address"`
+	MqttServerURI        string        `json:"mqtt_server_uri"`
+	MqttUsername         string        `json:"mqtt_server_username"`
+	MqttPassword         string        `json:"mqtt_server_password"`
+	MqttClientIdPrefix   string        `json:"mqtt_client_id_prefix"`
+	Token                string        `json:"token"`
+	BridgeId             string        `json:"bridge_id"`
+	StatePoolingInterval time.Duration `json:"state_pooling_interval"`
+	DimmerRangeMode      string        `json:"dimmer_range_mode"`
+	LogFile              string        `json:"log_file"`
+	LogLevel             string        `json:"log_level"`
+	LogFormat            string        `json:"log_format"`
+	ConfiguredAt         string        `json:"configured_at"`
+	ConfiguredBy         string        `json:"configured_by"`
+	DimmerMaxValue       int           `json:"-"`
 
 }
 
@@ -36,7 +38,8 @@ func (cf * Configs) LoadFromFile() error {
 	}
 	err = json.Unmarshal(configFileBody, cf)
 	if err != nil {
-		return err
+		cf.InitDefault()
+		return cf.SaveToFile()
 	}
 	if cf.StatePoolingInterval == 0 {
 		cf.StatePoolingInterval = 1
@@ -63,6 +66,8 @@ func (cf *Configs) InitDefault() {
 	cf.LogLevel = "info"
 	cf.LogFormat = "text"
 	cf.StatePoolingInterval = 1
+	cf.DimmerRangeMode = "255"
+	cf.DimmerMaxValue = 255
 }
 
 func (cf *Configs) IsConfigured()bool {

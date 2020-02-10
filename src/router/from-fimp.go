@@ -94,6 +94,9 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			val, _ := newMsg.Payload.GetIntValue()
 			light, _ := (*fc.bridge).GetLight(addrNum)
 			//light.Bri(uint8(val))
+			if fc.configs.DimmerMaxValue == 100 {
+				val = int64((255.0/100.0)*float64(val))
+			}
 			state := huego.State{On: true,Bri: uint8(val),TransitionTime:transitionTime}
 			_, err := (*fc.bridge).SetLightState(addrNum, state)
 			if err != nil {
@@ -215,13 +218,25 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 					discoveredIps = discoveredIps+","+b.Host
 				}
 			}
-			val := map[string]string{"host": discoveredIps, "username": "thingsplex", "sync_mode": "lights","bridge_id":bridgeId,"discovered":discoverdIds,"instructions":"press hue link button first"}
+			val := map[string]string{"host": discoveredIps, "username": "thingsplex", "sync_mode": "lights","bridge_id":bridgeId,"discovered":discoverdIds,
+				"instructions":"press hue link button first","dimmer_range_mode":fc.configs.DimmerRangeMode}
 			msg := fimpgo.NewStrMapMessage("evt.system.connect_params_report", ServiceName, val, nil, nil, newMsg.Payload)
 			if err := fc.mqt.RespondToRequest(newMsg.Payload, msg); err != nil {
 				fc.mqt.Publish(adr, msg)
 			}
 		case "cmd.config.set":
-			fallthrough
+			configs , err :=newMsg.Payload.GetStrMapValue()
+			if err != nil {
+				return
+			}
+			dimmerRange, _ := configs["dimmer_range_mode"]
+			if dimmerRange == "100" {
+				fc.configs.DimmerRangeMode = dimmerRange
+				fc.configs.DimmerMaxValue = 100
+			}else if dimmerRange == "255" {
+				fc.configs.DimmerRangeMode = dimmerRange
+				fc.configs.DimmerMaxValue = 100
+			}
 		case "cmd.log.set_level":
 			level , err :=newMsg.Payload.GetStringValue()
 			if err != nil {
@@ -246,12 +261,26 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			host, _ := reqVal["host"]
 			username, _ := reqVal["username"]
 			syncMode, _ := reqVal["sync_mode"]
+			dimmerRange, _ := reqVal["dimmer_range_mode"]
+			if dimmerRange == "100" {
+				fc.configs.DimmerRangeMode = dimmerRange
+				fc.configs.DimmerMaxValue = 100
+			}else if dimmerRange == "255" {
+				fc.configs.DimmerRangeMode = dimmerRange
+				fc.configs.DimmerMaxValue = 100
+			}
+			fc.stateMonitor.SetDimmerMaxValue(fc.configs.DimmerMaxValue)
+			fc.netService.SetDimmerMaxVal(fc.configs.DimmerMaxValue)
 			if username == "" {
 				username = "thingsplex"
 			}
 			bridgeId, ok := reqVal["bridge_id"]
 			if !ok {
 				log.Error("Incorrect bridge id")
+			}
+
+			if dimmerRange == "100" {
+
 			}
 
 			br , err := huego.DiscoverAll()

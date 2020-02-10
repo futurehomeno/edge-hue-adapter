@@ -19,6 +19,11 @@ type StateMonitor struct {
 
 	batteryLevels map[int]float64
 	instanceId   string
+	dimmerMaxValue int
+}
+
+func (st *StateMonitor) SetDimmerMaxValue(dimmerMaxValue int) {
+	st.dimmerMaxValue = dimmerMaxValue
 }
 
 func NewStateMonitor(mqt *fimpgo.MqttTransport, bridge **huego.Bridge,instanceId string) *StateMonitor {
@@ -27,6 +32,7 @@ func NewStateMonitor(mqt *fimpgo.MqttTransport, bridge **huego.Bridge,instanceId
 	st.sensorStates = map[int]huego.Sensor{}
 	st.lightsStates = map[int]huego.Light{}
 	st.batteryLevels = map[int]float64{}
+	st.dimmerMaxValue = 255
 	return st
 
 }
@@ -160,7 +166,13 @@ func (st *StateMonitor) processLights(lights []huego.Light) {
 		if oldState.State.Bri != newState.State.Bri {
 			// level report
 			isStateChanged = true
-			msg := fimpgo.NewIntMessage("evt.lvl.report", "out_lvl_switch", int64(newState.State.Bri), nil, nil, nil)
+			var val int64
+			if st.dimmerMaxValue == 100 {
+				val = int64((100.0/255.0)*float64(newState.State.Bri))
+			}else {
+				val = int64(newState.State.Bri)
+			}
+			msg := fimpgo.NewIntMessage("evt.lvl.report", "out_lvl_switch", val, nil, nil, nil)
 			adr := &fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeDevice, ResourceName: "hue", ResourceAddress: st.instanceId, ServiceName: "out_lvl_switch", ServiceAddress: servAddr}
 			st.mqt.Publish(adr,msg)
 			isStateChanged = true
