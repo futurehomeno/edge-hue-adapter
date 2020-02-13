@@ -73,8 +73,6 @@ func main() {
 	fimpRouter := router.NewFromFimpRouter(mqtt,appLifecycle,configs,bridge,stateMonitor)
 	fimpRouter.Start()
 
-
-
 	if configs.IsConfigured() && err == nil {
 		appLifecycle.PublishEvent(model.EventConfigured,"service",nil)
 	}

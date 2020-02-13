@@ -95,6 +95,9 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			light, _ := (*fc.bridge).GetLight(addrNum)
 			//light.Bri(uint8(val))
 			if fc.configs.DimmerMaxValue == 100 {
+				if val > 100 {
+					val = 100
+				}
 				val = int64((255.0/100.0)*float64(val))
 			}
 			state := huego.State{On: true,Bri: uint8(val),TransitionTime:transitionTime}
@@ -235,8 +238,10 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				fc.configs.DimmerMaxValue = 100
 			}else if dimmerRange == "255" {
 				fc.configs.DimmerRangeMode = dimmerRange
-				fc.configs.DimmerMaxValue = 100
+				fc.configs.DimmerMaxValue = 255
 			}
+			fc.stateMonitor.SetDimmerMaxValue(fc.configs.DimmerMaxValue)
+			fc.netService.SetDimmerMaxVal(fc.configs.DimmerMaxValue)
 		case "cmd.log.set_level":
 			level , err :=newMsg.Payload.GetStringValue()
 			if err != nil {
@@ -245,10 +250,11 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			logLevel, err := log.ParseLevel(level)
 			if err == nil {
 				log.SetLevel(logLevel)
+				fc.configs.LogLevel = level
+				fc.configs.SaveToFile()
 			}
-			fc.configs.LogLevel = level
-			fc.configs.SaveToFile()
-			log.Info("Log level updated")
+
+			log.Info("Log level updated to = ",logLevel)
 
 		case "cmd.system.connect":
 			reqVal, err := newMsg.Payload.GetStrMapValue()
