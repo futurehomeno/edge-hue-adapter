@@ -19,7 +19,7 @@ fi
 deb-systemd-helper unmask hue-ad.service >/dev/null || true
 
 if deb-systemd-helper --quiet was-enabled hue-ad.service; then
-  deb-systemd-helper enable hue-ad.service >/dev/null || true
+  systemctl enable hue-ad.service || true
 else
   deb-systemd-helper update-state hue-ad.service >/dev/null || true
 fi

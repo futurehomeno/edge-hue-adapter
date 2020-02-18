@@ -257,6 +257,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			log.Info("Log level updated to = ",logLevel)
 
 		case "cmd.system.connect":
+			//TODO: Adapter stops working if users attempt to connect while adapter is already connected
 			reqVal, err := newMsg.Payload.GetStrMapValue()
 			var errStr string
 			status := "ok"
@@ -308,10 +309,10 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 					fc.configs.Token = token
 					fc.configs.BridgeId = bridgeId
 					fc.appLifecycle.PublishEvent(model.EventConfigured, "from-fimp-router", nil)
+					fc.configs.SaveToFile()
 				}
 				log.Debugf("%s,%s", host, token)
 
-				fc.configs.SaveToFile()
 			}else {
 				status = "error"
 				errStr = "hue bridge can't be discovered"
