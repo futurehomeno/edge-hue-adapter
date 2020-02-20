@@ -58,6 +58,7 @@ func main() {
 	SetupLog(configs.LogFile, configs.LogLevel, configs.LogFormat)
 	log.Info("--------------Starting hue-ad----------------")
 	appLifecycle.PublishEvent(model.EventConfiguring, "main", nil)
+	appLifecycle.SetConnectivityState(model.ConnStateDisconnected)
 
 	mqtt := fimpgo.NewMqttTransport(configs.MqttServerURI, configs.MqttClientIdPrefix, configs.MqttUsername, configs.MqttPassword, true, 1, 1)
 	err = mqtt.Start()
@@ -82,6 +83,7 @@ func main() {
 		appLifecycle.WaitForState("main", model.StateRunning)
 		retryCounter = 0
 		for {
+			appLifecycle.SetConnectivityState(model.ConnStateConnecting)
 			br , err = huego.DiscoverAll()
 			if err == nil {
 				break
@@ -104,6 +106,13 @@ func main() {
 			if (*bridge).ID != "" {
 				log.Infof("Bridge discovered on address = %s , id = %s", (*bridge).Host,(*bridge).ID)
 				(*bridge).Login(configs.Token)
+				err = stateMonitor.TestConnection()
+				if err != nil {
+					appLifecycle.SetConnectivityState(model.ConnStateDisconnected)
+					appLifecycle.SetLastError(err.Error())
+				}else {
+					appLifecycle.SetConnectivityState(model.ConnStateConnected)
+				}
 				stateMonitor.Start()
 			}else {
 				log.Info("Adapter is not configured")

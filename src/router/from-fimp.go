@@ -258,6 +258,20 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 
 		case "cmd.system.connect":
 			//TODO: Adapter stops working if users attempt to connect while adapter is already connected
+
+			if fc.appLifecycle.ConnectivityState() == model.ConnStateConnected {
+				err := fc.stateMonitor.TestConnection()
+				if err == nil {
+					val := map[string]string{"status": "ok", "error": "already connected"}
+					msg := fimpgo.NewStrMapMessage("evt.system.connect_report", ServiceName, val, nil, nil, newMsg.Payload)
+					if err := fc.mqt.RespondToRequest(newMsg.Payload, msg); err != nil {
+						fc.mqt.Publish(adr, msg)
+					}
+					log.Warn("Already connected. Connection request skipped")
+					return
+				}
+			}
+
 			reqVal, err := newMsg.Payload.GetStrMapValue()
 			var errStr string
 			status := "ok"
@@ -320,30 +334,39 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 
 			if err != nil {
 				status = "error"
+			}else {
+				if syncMode == "full" || syncMode == "lights" {
+					lights, err := (*fc.bridge).GetLights()
+					if err != nil {
+						errStr = err.Error()
+						status = "error"
+					}else {
+						for _, l := range lights {
+							fc.netService.SendInclusionReport(fmt.Sprintf("l%d", l.ID))
+						}
+					}
+					sensors, err := (*fc.bridge).GetSensors()
+					if err != nil {
+						errStr = err.Error()
+						status = "error"
+					}else {
+						for _, l := range sensors {
+							fc.netService.SendInclusionReport(fmt.Sprintf("s%d", l.ID))
+						}
+					}
+
+				}
+			}
+			if status == "ok" {
+				fc.appLifecycle.SetConnectivityState(model.ConnStateConnected)
+			}else {
+				fc.appLifecycle.SetConnectivityState(model.ConnStateDisconnected)
+				fc.appLifecycle.SetLastError(errStr)
 			}
 			val := map[string]string{"status": status, "error": errStr}
 			msg := fimpgo.NewStrMapMessage("evt.system.connect_report", ServiceName, val, nil, nil, newMsg.Payload)
 			if err := fc.mqt.RespondToRequest(newMsg.Payload, msg); err != nil {
 				fc.mqt.Publish(adr, msg)
-			}
-
-			if syncMode == "full" || syncMode == "lights" {
-				lights, err := (*fc.bridge).GetLights()
-				if err != nil {
-					return
-				}
-				for _, l := range lights {
-					fc.netService.SendInclusionReport(fmt.Sprintf("l%d", l.ID))
-				}
-
-				sensors, err := (*fc.bridge).GetSensors()
-				if err != nil {
-					return
-				}
-				for _, l := range sensors {
-					fc.netService.SendInclusionReport(fmt.Sprintf("s%d", l.ID))
-				}
-
 			}
 
 		case "cmd.network.get_all_nodes":
@@ -418,13 +441,20 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 					return
 				}
 				exclReport := map[string]string{"address": deviceId}
-				msg := fimpgo.NewMessage("evt.thing.exclusion_report", "hue", fimpgo.VTypeObject, exclReport, nil, nil, nil)
+				msg := fimpgo.NewMessage("evt.thing.exclusion_report", ServiceName, fimpgo.VTypeObject, exclReport, nil, nil, nil)
 				adr := fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeAdapter, ResourceName: "hue", ResourceAddress: "1"}
 				fc.mqt.Publish(&adr, msg)
 				log.Info(deviceId)
 			} else {
 				log.Error("Incorrect address")
 
+			}
+
+		case "cmd.state.get_full_report":
+			val := map[string]string{"app":string(fc.appLifecycle.CurrentState()),"connection":string(fc.appLifecycle.ConnectivityState()),"last_err":fc.appLifecycle.LastError()}
+			msg := fimpgo.NewStrMapMessage("evt.state.full_report",ServiceName,val,nil,nil,newMsg.Payload)
+			if err := fc.mqt.RespondToRequest(newMsg.Payload,msg); err != nil {
+				fc.mqt.Publish(adr,msg)
 			}
 
 		}

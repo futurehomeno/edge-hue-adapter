@@ -47,6 +47,11 @@ func (st *StateMonitor) Stop() {
 	st.isRunnning = false
 }
 
+func (st *StateMonitor) TestConnection ()error {
+	_, err := (*st.bridge).GetLights()
+	return err
+}
+
 func (st *StateMonitor) SetPoolingInterval(interval time.Duration) {
 	st.interval = interval
 }

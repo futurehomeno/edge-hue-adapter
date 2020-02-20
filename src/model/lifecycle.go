@@ -21,6 +21,11 @@ const (
 	StateStartupError        = "STARTUP_ERROR"
 	StateTerminate           = "TERMINATE"
 
+	ConnStateConnecting      = "CONNECTING"
+	ConnStateConnected       = "CONNECTED"
+	ConnStateDisconnected    = "DISCONNECTED"
+	ConnStateReconnecting    = "RECONNECTING"
+
 	//EventStarting            = "STARTING"
 	EventConfiguring         = "CONFIGURING"          // All configurations loaded and brokers configured
 	EventConfigError         = "CONF_ERROR"           // All configurations loaded and brokers configured
@@ -42,14 +47,32 @@ type SystemEvent struct {
 type SystemEventChannel chan SystemEvent
 
 type Lifecycle struct {
-	busMux                 sync.Mutex
-	systemEventBus         map[string]SystemEventChannel
-	currentState           State
-	previousState          State
-	cloudConnectivityState State
-	receiveChTimeout       int
-	backendVersion         int
-	isPaired               bool
+	busMux            sync.Mutex
+	systemEventBus    map[string]SystemEventChannel
+	currentState      State
+	previousState     State
+	connectivityState State
+	receiveChTimeout  int
+	backendVersion    int
+	isPaired          bool
+	lastError         string
+}
+
+func (al *Lifecycle) LastError() string {
+	return al.lastError
+}
+
+func (al *Lifecycle) SetLastError(lastError string) {
+	al.lastError = lastError
+}
+
+func (al *Lifecycle) ConnectivityState() State {
+	return al.connectivityState
+}
+
+func (al *Lifecycle) SetConnectivityState(connectivityState State) {
+	log.Info("<sysEvt> Changing connection state to ",connectivityState)
+	al.connectivityState = connectivityState
 }
 
 func NewAppLifecycle() *Lifecycle {
