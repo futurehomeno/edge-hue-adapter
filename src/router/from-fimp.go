@@ -240,6 +240,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				fc.configs.DimmerRangeMode = dimmerRange
 				fc.configs.DimmerMaxValue = 255
 			}
+			fc.configs.SaveToFile()
 			fc.stateMonitor.SetDimmerMaxValue(fc.configs.DimmerMaxValue)
 			fc.netService.SetDimmerMaxVal(fc.configs.DimmerMaxValue)
 		case "cmd.log.set_level":
@@ -314,9 +315,11 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			}
 
 			if found {
-				token, err := (*fc.bridge).CreateUser(username)
+				var token string
+				token, err = (*fc.bridge).CreateUser(username)
 				if err != nil {
 					log.Error("Can't create user bridge ", err)
+					status = "error"
 					errStr = err.Error()
 				} else {
 					log.Info("User added", token)
@@ -336,24 +339,40 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				status = "error"
 			}else {
 				if syncMode == "full" || syncMode == "lights" {
-					lights, err := (*fc.bridge).GetLights()
-					if err != nil {
-						errStr = err.Error()
-						status = "error"
-					}else {
-						for _, l := range lights {
-							fc.netService.SendInclusionReport(fmt.Sprintf("l%d", l.ID))
+					initOk := false
+					for i:=1 ; i<4 ; i++ {
+						lights, err := (*fc.bridge).GetLights()
+						if err != nil {
+							errStr = err.Error()
+							status = "error"
+						}else {
+							initOk = true
+							for _, l := range lights {
+								fc.netService.SendInclusionReport(fmt.Sprintf("l%d", l.ID))
+							}
+						}
+						sensors, err := (*fc.bridge).GetSensors()
+						if err != nil {
+							errStr = err.Error()
+							status = "error"
+						}else {
+							initOk = true
+							for _, l := range sensors {
+								fc.netService.SendInclusionReport(fmt.Sprintf("s%d", l.ID))
+							}
+						}
+
+						if initOk {
+							log.Info(" --- Hue bridge connected successfully -----")
+							status = "ok"
+							errStr = ""
+							break
+						}else {
+							log.Info(" --- connection attempt failed . err :",errStr)
+							time.Sleep(time.Second*time.Duration(i*2))
 						}
 					}
-					sensors, err := (*fc.bridge).GetSensors()
-					if err != nil {
-						errStr = err.Error()
-						status = "error"
-					}else {
-						for _, l := range sensors {
-							fc.netService.SendInclusionReport(fmt.Sprintf("s%d", l.ID))
-						}
-					}
+
 
 				}
 			}

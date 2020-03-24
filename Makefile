@@ -1,8 +1,8 @@
-version="0.2.1"
+version="0.2.3"
 version_file=VERSION
 working_dir=$(shell pwd)
 arch="armhf"
-remote_host = "fh@aleks.local"
+remote_host = "fh@cube.local"
 
 clean:
 	-rm hue-ad
