@@ -44,9 +44,11 @@ func (cf * Configs) LoadFromFile() error {
 	if cf.StatePoolingInterval == 0 {
 		cf.StatePoolingInterval = 1
 	}
-	if cf.DimmerRangeMode == "" {
+	if cf.DimmerRangeMode == "" && cf.DimmerRangeMode== "255"{
 		cf.DimmerRangeMode = "255"
 		cf.DimmerMaxValue = 255
+	}else {
+		cf.DimmerMaxValue = 100
 	}
 	return nil
 }

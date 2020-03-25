@@ -27,6 +27,10 @@ type NetworkService struct {
 	dimmerMaxVal int
 }
 
+func (ns *NetworkService) DimmerMaxVal() int {
+	return ns.dimmerMaxVal
+}
+
 func (ns *NetworkService) SetDimmerMaxVal(dimmerMaxVal int) {
 	ns.dimmerMaxVal = dimmerMaxVal
 }

@@ -36,6 +36,8 @@ func NewFromFimpRouter(mqt *fimpgo.MqttTransport, appLifecycle *model.Lifecycle,
 func (fc *FromFimpRouter) Start() {
 	fc.mqt.Subscribe("pt:j1/mt:cmd/rt:dev/rn:hue/ad:1/#")
 	fc.mqt.Subscribe("pt:j1/mt:cmd/rt:ad/rn:hue/ad:1")
+	fc.stateMonitor.SetDimmerMaxValue(fc.configs.DimmerMaxValue)
+	fc.netService.SetDimmerMaxVal(fc.configs.DimmerMaxValue)
 	go func(msgChan fimpgo.MessageCh) {
 		for {
 			select {
@@ -243,6 +245,8 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			fc.configs.SaveToFile()
 			fc.stateMonitor.SetDimmerMaxValue(fc.configs.DimmerMaxValue)
 			fc.netService.SetDimmerMaxVal(fc.configs.DimmerMaxValue)
+		case "cmd.config.get_report" :
+			log.Info("Dimmer max value st = %d , ns = %d",fc.stateMonitor.DimmerMaxValue(),fc.netService.DimmerMaxVal())
 		case "cmd.log.set_level":
 			level , err :=newMsg.Payload.GetStringValue()
 			if err != nil {

@@ -22,6 +22,11 @@ type StateMonitor struct {
 	dimmerMaxValue int
 }
 
+func (st *StateMonitor) DimmerMaxValue() int {
+	return st.dimmerMaxValue
+}
+
+
 func (st *StateMonitor) SetDimmerMaxValue(dimmerMaxValue int) {
 	st.dimmerMaxValue = dimmerMaxValue
 }
