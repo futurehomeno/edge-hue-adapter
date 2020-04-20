@@ -20,6 +20,8 @@ github.com/futurehomeno/fimpgo v1.4.8 h1:8WDxIPYTS9pshlH8nVI1psfyqqGAU5m6VqksrpZ
 github.com/futurehomeno/fimpgo v1.4.8/go.mod h1:qWhd1VFe4yaePWcKzp7NuJqcX9PlzjEPfE+YTRZbCtA=
 github.com/futurehomeno/fimpgo v1.4.10 h1:8CtT+q2t8F8MhxXO6SXdUDPmJuDVX+uCvc5gAXg6HW8=
 github.com/futurehomeno/fimpgo v1.4.10/go.mod h1:qWhd1VFe4yaePWcKzp7NuJqcX9PlzjEPfE+YTRZbCtA=
+github.com/futurehomeno/fimpgo v1.5.1 h1:W5sw0WW5PJb8pMTM1exd1Su4ykAQLSiAIN9Z2OEPHVY=
+github.com/futurehomeno/fimpgo v1.5.1/go.mod h1:qWhd1VFe4yaePWcKzp7NuJqcX9PlzjEPfE+YTRZbCtA=
 github.com/google/uuid v1.1.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/jarcoal/httpmock v1.0.4/go.mod h1:ATjnClrvW/3tijVmpL/va5Z3aAyGvqU3gCT8nX0Txik=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1 h1:mweAR1A6xJ3oS2pRaGiHgQ4OO8tzTaLawm8vnODuwDk=

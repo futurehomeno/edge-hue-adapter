@@ -2,9 +2,15 @@ package model
 
 import (
 	"encoding/json"
+	"fmt"
+	log "github.com/sirupsen/logrus"
+	"github.com/thingsplex/hue-ad/utils"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"time"
 )
+
 
 type Configs struct {
 	path                 string
@@ -22,12 +28,27 @@ type Configs struct {
 	LogFormat            string        `json:"log_format"`
 	ConfiguredAt         string        `json:"configured_at"`
 	ConfiguredBy         string        `json:"configured_by"`
+	Username             string        `json:"username"`
+	Host                 string        `json:"host"`
 	DimmerMaxValue       int           `json:"-"`
+	WorkDir              string        `json:"-"`
+	DiscoveredBridges    string        `json:"discovered_bridges"`
 
 }
 
-func NewConfigs(path string) *Configs {
-	return &Configs{path:path}
+func NewConfigs(workDir string) *Configs {
+	conf := &Configs{WorkDir: workDir}
+	conf.path = filepath.Join(workDir,"data","config.json")
+	if !utils.FileExists(conf.path) {
+		log.Info("Config file doesn't exist.Loading default config")
+		defaultConfigFile := filepath.Join(workDir,"defaults","config.json")
+		err := utils.CopyFile(defaultConfigFile,conf.path)
+		if err != nil {
+			fmt.Print(err)
+			panic("Can't copy config file.")
+		}
+	}
+	return conf
 }
 
 func (cf * Configs) LoadFromFile() error {
@@ -82,5 +103,25 @@ func (cf *Configs) IsConfigured()bool {
 	}else {
 		return false
 	}
+}
 
+func (cf *Configs) GetDataDir()string {
+	return filepath.Join(cf.WorkDir,"data")
+}
+
+func (cf *Configs) GetDefaultDir()string {
+	return filepath.Join(cf.WorkDir,"defaults")
+}
+
+func (cf * Configs) LoadDefaults()error {
+	configFile := filepath.Join(cf.WorkDir,"data","config.json")
+	os.Remove(configFile)
+	log.Info("Config file doesn't exist.Loading default config")
+	defaultConfigFile := filepath.Join(cf.WorkDir,"defaults","config.json")
+	return utils.CopyFile(defaultConfigFile,configFile)
+}
+
+type ConfigReport struct {
+	OpStatus string `json:"op_status"`
+	AppState AppStates `json:"app_state"`
 }

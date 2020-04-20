@@ -7,8 +7,8 @@ then
   groupadd -r hue-ad || true
 
   useradd -r -N -M -d / -s /bin/false -g thingsplex hue-ad || true
-  if [ ! -f /opt/thingsplex/hue-ad/config.json ]; then
-		  cp /opt/thingsplex/hue-ad/defaults/config.json /opt/thingsplex/hue-ad/config.json || true
+  if [ ! -f /opt/thingsplex/hue-ad/data/config.json ]; then
+		  cp /opt/thingsplex/hue-ad/defaults/config.json /opt/thingsplex/hue-ad/data/config.json || true
 	fi
   chown -R hue-ad:thingsplex /var/log/thingsplex/hue-ad/ || true
   chown -R hue-ad:hue-ad /opt/thingsplex/hue-ad/ || true

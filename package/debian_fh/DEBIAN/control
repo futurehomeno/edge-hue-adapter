@@ -1,8 +1,0 @@
-Package: hue-ad
-Version: 0.2.4
-Replaces: hue-ad
-Section: non-free/misc
-Priority: optional
-Architecture: armhf
-Maintainer: Aleksandrs Livincovs <aleksandrs.livincovs@gmail.com>
-Description: Philips Hue adapter for futurehome system .

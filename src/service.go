@@ -9,56 +9,31 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/thingsplex/hue-ad/model"
 	"github.com/thingsplex/hue-ad/router"
-	"gopkg.in/natefinch/lumberjack.v2"
+	"github.com/thingsplex/hue-ad/utils"
 	"time"
 )
 
-func SetupLog(logfile string, level string, logFormat string) {
-	if logFormat == "json" {
-		log.SetFormatter(&log.JSONFormatter{TimestampFormat: "2006-01-02 15:04:05.999"})
-	} else {
-		log.SetFormatter(&log.TextFormatter{FullTimestamp: true, ForceColors: true, TimestampFormat: "2006-01-02T15:04:05.999"})
-	}
-
-	logLevel, err := log.ParseLevel(level)
-	if err == nil {
-		log.SetLevel(logLevel)
-	} else {
-		log.SetLevel(log.DebugLevel)
-	}
-
-	if logfile != "" {
-		l := lumberjack.Logger{
-			Filename:   logfile,
-			MaxSize:    5, // megabytes
-			MaxBackups: 2,
-		}
-		log.SetOutput(&l)
-	}
-
-}
-
 func main() {
-	var configFile string
-	flag.StringVar(&configFile, "c", "", "Config file")
+	var workDir string
+	flag.StringVar(&workDir, "c", "", "Work dir")
 	flag.Parse()
-	if configFile == "" {
-		configFile = "./config.json"
+	if workDir == "" {
+		workDir = "./"
 	} else {
-		fmt.Println("Loading configs from file ", configFile)
+		fmt.Println("Work dir ", workDir)
 	}
 	appLifecycle := model.NewAppLifecycle()
-	configs := model.NewConfigs(configFile)
+	configs := model.NewConfigs(workDir)
 	err := configs.LoadFromFile()
 	if err != nil {
 		fmt.Print(err)
 		panic("Can't load config file.")
 	}
 
-	SetupLog(configs.LogFile, configs.LogLevel, configs.LogFormat)
+	utils.SetupLog(configs.LogFile, configs.LogLevel, configs.LogFormat)
 	log.Info("--------------Starting hue-ad----------------")
 	appLifecycle.PublishEvent(model.EventConfiguring, "main", nil)
-	appLifecycle.SetConnectivityState(model.ConnStateDisconnected)
+	appLifecycle.SetConnectionState(model.ConnStateDisconnected)
 
 	mqtt := fimpgo.NewMqttTransport(configs.MqttServerURI, configs.MqttClientIdPrefix, configs.MqttUsername, configs.MqttPassword, true, 1, 1)
 	err = mqtt.Start()
@@ -75,7 +50,10 @@ func main() {
 	fimpRouter.Start()
 
 	if configs.IsConfigured() && err == nil {
+		appLifecycle.SetConfigState(model.ConfigStateConfigured)
 		appLifecycle.PublishEvent(model.EventConfigured,"service",nil)
+	}else {
+		appLifecycle.SetAppState(model.AppStateNotConfigured,nil)
 	}
     var br []huego.Bridge
 	var retryCounter int
@@ -83,7 +61,7 @@ func main() {
 		appLifecycle.WaitForState("main", model.StateRunning)
 		retryCounter = 0
 		for {
-			appLifecycle.SetConnectivityState(model.ConnStateConnecting)
+			appLifecycle.SetConnectionState(model.ConnStateConnecting)
 			br , err = huego.DiscoverAll()
 			if err == nil {
 				break
@@ -108,10 +86,10 @@ func main() {
 				(*bridge).Login(configs.Token)
 				err = stateMonitor.TestConnection()
 				if err != nil {
-					appLifecycle.SetConnectivityState(model.ConnStateDisconnected)
+					appLifecycle.SetConnectionState(model.ConnStateDisconnected)
 					appLifecycle.SetLastError(err.Error())
 				}else {
-					appLifecycle.SetConnectivityState(model.ConnStateConnected)
+					appLifecycle.SetConnectionState(model.ConnStateConnected)
 				}
 				stateMonitor.Start()
 			}else {

@@ -35,14 +35,6 @@ package-deb-doc-tp:
 	docker run --rm -v ${working_dir}:/build -w /build --name debuild debian dpkg-deb --build package/debian_tp
 	@echo "Done"
 
-package-deb-doc-fh:
-	@echo "Packaging application as Futurehome debian package"
-	chmod a+x package/debian_fh/DEBIAN/*
-	cp ./src/hue-ad package/debian_fh/usr/bin/hue-ad
-	cp VERSION package/debian_fh/var/lib/futurehome/hue-ad
-	docker run --rm -v ${working_dir}:/build -w /build --name debuild debian dpkg-deb --build package/debian_fh
-	@echo "Done"
-
 
 deb-arm : clean configure-arm build-go-arm package-deb-doc-tp
 	mv package/debian_tp.deb package/build/hue-ad_$(version)_armhf.deb

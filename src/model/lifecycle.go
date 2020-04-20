@@ -24,7 +24,7 @@ const (
 	ConnStateConnecting      = "CONNECTING"
 	ConnStateConnected       = "CONNECTED"
 	ConnStateDisconnected    = "DISCONNECTED"
-	ConnStateReconnecting    = "RECONNECTING"
+	ConnStateNA              = "NA"
 
 	//EventStarting            = "STARTING"
 	EventConfiguring         = "CONFIGURING"          // All configurations loaded and brokers configured
@@ -32,9 +32,38 @@ const (
 	EventConfigured          = "CONFIGURED"          // All configurations loaded and brokers configured
 	EventRunning             = "RUNNING"
 
+
+	AppStateStarting      = "STARTING"
+	AppStateStartupError  = "STARTUP_ERROR"
+	AppStateNotConfigured = "NOT_CONFIGURED"
+	AppStateError         = "ERROR"
+	AppStateRunning       = "RUNNING"
+	AppStateTerminate     = "TERMINATING"
+
+	ConfigStateNotConfigured = "NOT_CONFIGURED"
+	ConfigStateConfigured    = "CONFIGURED"
+	ConfigStatePartConfigured= "PART_CONFIGURED"
+	ConfigStateInProgress    = "IN_PROGRESS"
+	ConfigStateNA            = "NA"
+
+	AuthStateNotAuthenticated = "NOT_AUTHENTICATED"
+	AuthStateAuthenticated    = "AUTHENTICATED"
+	AuthStateInProgress       = "IN_PROGRESS"
+	AuthStateNA               = "NA"
+
 )
 
 type State string
+
+type AppStates struct {
+	App           string `json:"app"`
+	Connection    string `json:"connection"`
+	Config        string `json:"config"`
+	Auth          string `json:"auth"`
+	LastErrorText string `json:"last_error_text"`
+	LastErrorCode string `json:"last_error_code"`
+}
+
 
 type SystemEvent struct {
 	Type   string
@@ -47,15 +76,18 @@ type SystemEvent struct {
 type SystemEventChannel chan SystemEvent
 
 type Lifecycle struct {
-	busMux            sync.Mutex
-	systemEventBus    map[string]SystemEventChannel
-	currentState      State
-	previousState     State
-	connectivityState State
-	receiveChTimeout  int
-	backendVersion    int
-	isPaired          bool
-	lastError         string
+	busMux           sync.Mutex
+	systemEventBus   map[string]SystemEventChannel
+	appState         State
+	previousState    State
+	receiveChTimeout int
+	backendVersion   int
+	isPaired         bool
+	lastError        string
+
+	connectionState  State
+	authState        State
+	configState      State
 }
 
 func (al *Lifecycle) LastError() string {
@@ -66,28 +98,61 @@ func (al *Lifecycle) SetLastError(lastError string) {
 	al.lastError = lastError
 }
 
-func (al *Lifecycle) ConnectivityState() State {
-	return al.connectivityState
-}
-
-func (al *Lifecycle) SetConnectivityState(connectivityState State) {
-	log.Info("<sysEvt> Changing connection state to ",connectivityState)
-	al.connectivityState = connectivityState
-}
-
 func NewAppLifecycle() *Lifecycle {
-
-	return &Lifecycle{systemEventBus: make(map[string]SystemEventChannel)}
+	lf := &Lifecycle{systemEventBus: make(map[string]SystemEventChannel)}
+	lf.appState = AppStateStarting
+	lf.authState = AuthStateNA
+	lf.configState = ConfigStateNotConfigured
+	lf.connectionState = ConnStateDisconnected
+	return lf
 }
 
-func (al *Lifecycle) CurrentState() State {
-	return al.currentState
+func (al *Lifecycle) GetAllStates() *AppStates {
+	appStates := AppStates{
+		App:          string(al.appState),
+		Connection:   string(al.connectionState),
+		Config:       string(al.configState),
+		Auth:         string(al.authState),
+		LastErrorText: al.lastError,
+		LastErrorCode: "",
+	}
+	return &appStates
 }
 
-func (al *Lifecycle) SetCurrentState(currentState State, params map[string]string) {
+
+func (al *Lifecycle) ConfigState() State {
+	return al.configState
+}
+
+func (al *Lifecycle) SetConfigState(configState State) {
+	al.configState = configState
+}
+
+func (al *Lifecycle) AuthState() State {
+	return al.authState
+}
+
+func (al *Lifecycle) SetAuthState(authState State) {
+	al.authState = authState
+}
+
+func (al *Lifecycle) ConnectionState() State {
+	return al.connectionState
+}
+
+func (al *Lifecycle) SetConnectionState(connectivityState State) {
+	al.connectionState = connectivityState
+}
+
+func (al *Lifecycle) AppState() State {
+	return al.appState
+}
+
+
+func (al *Lifecycle) SetAppState(currentState State, params map[string]string) {
 	al.busMux.Lock()
-	al.previousState = al.currentState
-	al.currentState = currentState
+	al.previousState = al.appState
+	al.appState = currentState
 	log.Debug("<sysEvt> New system state = ", currentState)
 	for i := range al.systemEventBus {
 		select {
@@ -108,7 +173,7 @@ func (al *Lifecycle) PublishEvent(name,src string, params map[string]string) {
 func (al *Lifecycle) Publish(event SystemEvent, src string, params map[string]string) {
 	al.busMux.Lock()
 	event.Type = SystemEventTypeEvent
-	event.State = al.CurrentState()
+	event.State = al.AppState()
 	event.Params = params
 	for i := range al.systemEventBus {
 		select {
@@ -140,22 +205,22 @@ func (al *Lifecycle) processEvent(event SystemEvent) {
 	switch event.Name {
 
 	case EventConfiguring:
-		al.SetCurrentState(StateConfiguring, nil)
+		al.SetAppState(StateConfiguring, nil)
 
 	case EventConfigured:
-		al.SetCurrentState(StateConfigured, nil)
-		al.SetCurrentState(StateRunning, nil)
+		al.SetAppState(StateConfigured, nil)
+		al.SetAppState(StateRunning, nil)
 
 	case EventConfigError:
-		al.SetCurrentState(StateNotConfigured, nil)
+		al.SetAppState(StateNotConfigured, nil)
 	}
 
 }
 
 // WaitForState blocks until target state is reached
 func (al *Lifecycle) WaitForState(subId string, targetState State) {
-	log.Debugf("<sysEvt> Waiting for state = %s , current state = %s", targetState, al.CurrentState())
-	if al.CurrentState() == targetState {
+	log.Debugf("<sysEvt> Waiting for state = %s , current state = %s", targetState, al.AppState())
+	if al.AppState() == targetState {
 		return
 	}
 	ch := al.Subscribe(subId, 5)

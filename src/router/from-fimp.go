@@ -7,6 +7,7 @@ import (
 	"github.com/lucasb-eyer/go-colorful"
 	log "github.com/sirupsen/logrus"
 	"github.com/thingsplex/hue-ad/model"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -89,7 +90,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				light.State.On = false
 			}
 			msg := fimpgo.NewBoolMessage("evt.binary.report", "out_lvl_switch", val, nil, nil, newMsg.Payload)
-			adr := &fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeDevice, ResourceName: "hue", ResourceAddress: fc.configs.InstanceAddress, ServiceName: "out_lvl_switch", ServiceAddress: newMsg.Addr.ServiceAddress}
+			adr := &fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeDevice, ResourceName: ServiceName, ResourceAddress: fc.configs.InstanceAddress, ServiceName: "out_lvl_switch", ServiceAddress: newMsg.Addr.ServiceAddress}
 			fc.mqt.Publish(adr,msg)
 			//log.Debug("Status code = ",respH.StatusCode)
 		case "cmd.lvl.set":
@@ -109,7 +110,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			}
 			light.State.Bri = uint8(val)
 			msg := fimpgo.NewIntMessage("evt.lvl.report", "out_lvl_switch", val, nil, nil, newMsg.Payload)
-			adr := &fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeDevice, ResourceName: "hue", ResourceAddress: fc.configs.InstanceAddress, ServiceName: "out_lvl_switch", ServiceAddress: newMsg.Addr.ServiceAddress}
+			adr := &fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeDevice, ResourceName: ServiceName, ResourceAddress: fc.configs.InstanceAddress, ServiceName: "out_lvl_switch", ServiceAddress: newMsg.Addr.ServiceAddress}
 			fc.mqt.Publish(adr,msg)
 		}
 
@@ -208,27 +209,19 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			for _, l := range sensors {
 				fc.netService.SendInclusionReport(fmt.Sprintf("s%d", l.ID))
 			}
-
-		case "cmd.system.get_connect_params":
-			br,_ := huego.DiscoverAll()
-			var discoverdIds , discoveredIps,bridgeId string
-
-			if len(br)==1 {
-				discoverdIds = br[0].ID
-				discoveredIps = br[0].Host
-				bridgeId = br[0].ID
-			}else {
-				for _,b := range br {
-					discoverdIds = discoverdIds+","+b.ID
-					discoveredIps = discoveredIps+","+b.Host
-				}
+		case "cmd.config.get_extended_report":
+			msg := fimpgo.NewMessage("evt.config.extended_report",ServiceName,fimpgo.VTypeObject,fc.configs,nil,nil,newMsg.Payload)
+			if err := fc.mqt.RespondToRequest(newMsg.Payload, msg); err != nil {
+				fc.mqt.Publish(adr, msg)
 			}
-			val := map[string]string{"host": discoveredIps, "username": "thingsplex", "sync_mode": "lights","bridge_id":bridgeId,"discovered":discoverdIds,
-				"instructions":"press hue link button first","dimmer_range_mode":fc.configs.DimmerRangeMode}
+		// Deprecated API
+		case "cmd.system.get_connect_params":
+			val,_ := fc.discoverBridge()
 			msg := fimpgo.NewStrMapMessage("evt.system.connect_params_report", ServiceName, val, nil, nil, newMsg.Payload)
 			if err := fc.mqt.RespondToRequest(newMsg.Payload, msg); err != nil {
 				fc.mqt.Publish(adr, msg)
 			}
+		// Deprecated API
 		case "cmd.config.set":
 			configs , err :=newMsg.Payload.GetStrMapValue()
 			if err != nil {
@@ -261,10 +254,136 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 
 			log.Info("Log level updated to = ",logLevel)
 
-		case "cmd.system.connect":
-			//TODO: Adapter stops working if users attempt to connect while adapter is already connected
+		case "cmd.app.get_manifest":
+			mode,err := newMsg.Payload.GetStringValue()
+			if err != nil {
+				log.Error("Incorrect request format ")
+				return
+			}
+			manifest := model.NewManifest()
+			err = manifest.LoadFromFile(filepath.Join(fc.configs.GetDefaultDir(),"app-manifest.json"))
+			if err != nil {
+				log.Error("Failed to load manifest file .Error :",err.Error())
+				return
+			}
+			if mode == "manifest_state" {
+				manifest.AppState = *fc.appLifecycle.GetAllStates()
+				manifest.ConfigState = fc.configs
+			}
+			msg := fimpgo.NewMessage("evt.app.manifest_report",ServiceName,fimpgo.VTypeObject,manifest,nil,nil,newMsg.Payload)
+			if err := fc.mqt.RespondToRequest(newMsg.Payload,msg); err != nil {
+				// if response topic is not set , sending back to default application event topic
+				fc.mqt.Publish(adr,msg)
+			}
 
-			if fc.appLifecycle.ConnectivityState() == model.ConnStateConnected {
+		case "cmd.config.extended_set":
+			reqVal, err := newMsg.Payload.GetStrMapValue()
+			if err != nil {
+				log.Error("Incorrect extended set message ")
+				return
+			}
+			host, _ := reqVal["host"]
+			username, _ := reqVal["username"]
+			//syncMode, _ := reqVal["sync_mode"]
+			dimmerRange, _ := reqVal["dimmer_range_mode"]
+			if dimmerRange == "100" {
+				fc.configs.DimmerRangeMode = dimmerRange
+				fc.configs.DimmerMaxValue = 100
+			}else if dimmerRange == "255" {
+				fc.configs.DimmerRangeMode = dimmerRange
+				fc.configs.DimmerMaxValue = 100
+			}
+			fc.stateMonitor.SetDimmerMaxValue(fc.configs.DimmerMaxValue)
+			fc.netService.SetDimmerMaxVal(fc.configs.DimmerMaxValue)
+			if username == "" {
+				username = "thingsplex"
+			}
+			bridgeId, ok := reqVal["bridge_id"]
+			if !ok {
+				log.Error("Incorrect bridge id")
+			}
+			fc.configs.BridgeId = bridgeId
+			fc.configs.Username = username
+			fc.configs.Host = host
+			fc.configs.SaveToFile()
+
+			configReport := model.ConfigReport{
+				OpStatus: "OK",
+				AppState:  *fc.appLifecycle.GetAllStates(),
+			}
+			fc.appLifecycle.SetConfigState(model.ConfigStateConfigured)
+			msg := fimpgo.NewMessage("evt.app.config_report",ServiceName,fimpgo.VTypeObject,configReport,nil,nil,newMsg.Payload)
+			if err := fc.mqt.RespondToRequest(newMsg.Payload,msg); err != nil {
+				fc.mqt.Publish(adr,msg)
+			}
+
+		case "cmd.bridge.connect":
+			fc.appLifecycle.SetLastError("")
+			if fc.appLifecycle.ConnectionState() == model.ConnStateConnected {
+				err := fc.stateMonitor.TestConnection()
+				if err == nil {
+
+					val := model.ButtonActionResponse{
+						Operation:       "cmd.bridge.connect",
+						OperationStatus: "ok",
+						Next:            "reload",
+						ErrorCode:       "E1",
+						ErrorText:       "Bridge already connected",
+					}
+					msg := fimpgo.NewMessage("evt.app.config_action_report",ServiceName,fimpgo.VTypeObject,val,nil,nil,newMsg.Payload)
+					if err := fc.mqt.RespondToRequest(newMsg.Payload,msg); err != nil {
+						fc.mqt.Publish(adr,msg)
+					}
+					log.Warn("Already connected. Connection request skipped")
+					return
+				}
+			}
+			fc.appLifecycle.SetConnectionState(model.ConnStateConnecting)
+			status,errStr := fc.connectToBridge(fc.configs.BridgeId,"thingsplex",fc.configs.Host,"full")
+			val := model.ButtonActionResponse{
+				Operation:       "cmd.bridge.connect",
+				OperationStatus: strings.ToUpper(status),
+				Next:            "reload",
+				ErrorCode:       "E1",
+				ErrorText:       errStr,
+			}
+			if status == "ok" {
+				fc.appLifecycle.SetConnectionState(model.ConnStateConnected)
+				fc.appLifecycle.SetAppState(model.AppStateRunning,nil)
+			}else {
+				fc.appLifecycle.SetLastError(errStr)
+			}
+			msg := fimpgo.NewMessage("evt.app.config_action_report",ServiceName,fimpgo.VTypeObject,val,nil,nil,newMsg.Payload)
+			if err := fc.mqt.RespondToRequest(newMsg.Payload,msg); err != nil {
+				fc.mqt.Publish(adr,msg)
+			}
+
+		case "cmd.bridge.discover":
+			discoveryReport,err := fc.discoverBridge()
+			status := "OK"
+			errStr := ""
+			if err !=nil {
+				status = "ERROR"
+				errStr = err.Error()
+			}else {
+				fc.configs.DiscoveredBridges,_ = discoveryReport["discovered"]
+				fc.configs.Host,_ = discoveryReport["host"]
+				fc.configs.BridgeId , _ = discoveryReport["bridge_id"]
+			}
+			val := model.ButtonActionResponse{
+				Operation:       "cmd.bridge.connect",
+				OperationStatus: status,
+				Next:            "reload",
+				ErrorCode:       "E1",
+				ErrorText:       errStr,
+			}
+			msg := fimpgo.NewMessage("evt.app.config_action_report",ServiceName,fimpgo.VTypeObject,val,nil,nil,newMsg.Payload)
+			if err := fc.mqt.RespondToRequest(newMsg.Payload,msg); err != nil {
+				fc.mqt.Publish(adr,msg)
+			}
+		// Deprecated old API
+		case "cmd.system.connect":
+			if fc.appLifecycle.ConnectionState() == model.ConnStateConnected {
 				err := fc.stateMonitor.TestConnection()
 				if err == nil {
 					val := map[string]string{"status": "ok", "error": "already connected"}
@@ -276,7 +395,6 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 					return
 				}
 			}
-
 			reqVal, err := newMsg.Payload.GetStrMapValue()
 			var errStr string
 			status := "ok"
@@ -284,6 +402,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				log.Error("Incorrect login message ")
 				errStr = err.Error()
 			}
+
 			host, _ := reqVal["host"]
 			username, _ := reqVal["username"]
 			syncMode, _ := reqVal["sync_mode"]
@@ -305,87 +424,8 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				log.Error("Incorrect bridge id")
 			}
 
-			if dimmerRange == "100" {
+			status,errStr = fc.connectToBridge(bridgeId,username,host,syncMode)
 
-			}
-
-			br , err := huego.DiscoverAll()
-			var found bool
-			for _,b := range br {
-				if b.ID == bridgeId {
-					*fc.bridge = &b
-					found = true
-				}
-			}
-
-			if found {
-				var token string
-				token, err = (*fc.bridge).CreateUser(username)
-				if err != nil {
-					log.Error("Can't create user bridge ", err)
-					status = "error"
-					errStr = err.Error()
-				} else {
-					log.Info("User added", token)
-					fc.configs.Token = token
-					fc.configs.BridgeId = bridgeId
-					fc.appLifecycle.PublishEvent(model.EventConfigured, "from-fimp-router", nil)
-					fc.configs.SaveToFile()
-				}
-				log.Debugf("%s,%s", host, token)
-
-			}else {
-				status = "error"
-				errStr = "hue bridge can't be discovered"
-			}
-
-			if err != nil {
-				status = "error"
-			}else {
-				if syncMode == "full" || syncMode == "lights" {
-					initOk := false
-					for i:=1 ; i<4 ; i++ {
-						lights, err := (*fc.bridge).GetLights()
-						if err != nil {
-							errStr = err.Error()
-							status = "error"
-						}else {
-							initOk = true
-							for _, l := range lights {
-								fc.netService.SendInclusionReport(fmt.Sprintf("l%d", l.ID))
-							}
-						}
-						sensors, err := (*fc.bridge).GetSensors()
-						if err != nil {
-							errStr = err.Error()
-							status = "error"
-						}else {
-							initOk = true
-							for _, l := range sensors {
-								fc.netService.SendInclusionReport(fmt.Sprintf("s%d", l.ID))
-							}
-						}
-
-						if initOk {
-							log.Info(" --- Hue bridge connected successfully -----")
-							status = "ok"
-							errStr = ""
-							break
-						}else {
-							log.Info(" --- connection attempt failed . err :",errStr)
-							time.Sleep(time.Second*time.Duration(i*2))
-						}
-					}
-
-
-				}
-			}
-			if status == "ok" {
-				fc.appLifecycle.SetConnectivityState(model.ConnStateConnected)
-			}else {
-				fc.appLifecycle.SetConnectivityState(model.ConnStateDisconnected)
-				fc.appLifecycle.SetLastError(errStr)
-			}
 			val := map[string]string{"status": status, "error": errStr}
 			msg := fimpgo.NewStrMapMessage("evt.system.connect_report", ServiceName, val, nil, nil, newMsg.Payload)
 			if err := fc.mqt.RespondToRequest(newMsg.Payload, msg); err != nil {
@@ -474,15 +514,113 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			}
 
 		case "cmd.state.get_full_report":
-			val := map[string]string{"app":string(fc.appLifecycle.CurrentState()),"connection":string(fc.appLifecycle.ConnectivityState()),"last_err":fc.appLifecycle.LastError()}
+			val := map[string]string{"app":string(fc.appLifecycle.AppState()),"connection":string(fc.appLifecycle.ConnectionState()),"last_err":fc.appLifecycle.LastError()}
 			msg := fimpgo.NewStrMapMessage("evt.state.full_report",ServiceName,val,nil,nil,newMsg.Payload)
 			if err := fc.mqt.RespondToRequest(newMsg.Payload,msg); err != nil {
 				fc.mqt.Publish(adr,msg)
 			}
 
 		}
-		//
+	}
+}
 
+func (fc *FromFimpRouter) connectToBridge(bridgeId,username,host,syncMode string)(status string , errStr string) {
+	br , err := huego.DiscoverAll()
+	var found bool
+	for _,b := range br {
+		if b.ID == bridgeId {
+			*fc.bridge = &b
+			found = true
+		}
 	}
 
+	if found {
+		var token string
+		token, err = (*fc.bridge).CreateUser(username)
+		if err != nil {
+			log.Error("Can't create user bridge ", err)
+			status = "error"
+			errStr = err.Error()
+		} else {
+			log.Info("User added", token)
+			fc.configs.Token = token
+			fc.configs.BridgeId = bridgeId
+			fc.appLifecycle.PublishEvent(model.EventConfigured, "from-fimp-router", nil)
+			fc.configs.SaveToFile()
+		}
+		log.Debugf("%s,%s", host, token)
+
+	}else {
+		status = "error"
+		errStr = "hue bridge can't be discovered"
+	}
+
+	if err != nil {
+		status = "error"
+	}else {
+		if syncMode == "full" || syncMode == "lights" {
+			initOk := false
+			for i:=1 ; i<4 ; i++ {
+				lights, err := (*fc.bridge).GetLights()
+				if err != nil {
+					errStr = err.Error()
+					status = "error"
+				}else {
+					initOk = true
+					for _, l := range lights {
+						fc.netService.SendInclusionReport(fmt.Sprintf("l%d", l.ID))
+					}
+				}
+				sensors, err := (*fc.bridge).GetSensors()
+				if err != nil {
+					errStr = err.Error()
+					status = "error"
+				}else {
+					initOk = true
+					for _, l := range sensors {
+						fc.netService.SendInclusionReport(fmt.Sprintf("s%d", l.ID))
+					}
+				}
+
+				if initOk {
+					log.Info(" --- Hue bridge connected successfully -----")
+					status = "ok"
+					errStr = ""
+					break
+				}else {
+					log.Info(" --- connection attempt failed . err :",errStr)
+					time.Sleep(time.Second*time.Duration(i*2))
+				}
+			}
+
+
+		}
+	}
+	if status == "ok" {
+		fc.appLifecycle.SetConnectionState(model.ConnStateConnected)
+	}else {
+		fc.appLifecycle.SetConnectionState(model.ConnStateDisconnected)
+		fc.appLifecycle.SetLastError(errStr)
+	}
+	return
+}
+
+func (fc *FromFimpRouter) discoverBridge() (map[string]string,error) {
+	br,err := huego.DiscoverAll()
+	if err != nil {
+		return nil, err
+	}
+	var discoverdIds , discoveredIps,bridgeId string
+	if len(br)==1 {
+		discoverdIds = br[0].ID
+		discoveredIps = br[0].Host
+		bridgeId = br[0].ID
+	}else {
+		for _,b := range br {
+			discoverdIds = discoverdIds+","+b.ID
+			discoveredIps = discoveredIps+","+b.Host
+		}
+	}
+	return map[string]string{"host": discoveredIps, "username": "thingsplex", "sync_mode": "lights","bridge_id":bridgeId,"discovered":discoverdIds,
+		"instructions":"press hue link button first","dimmer_range_mode":fc.configs.DimmerRangeMode},nil
 }
