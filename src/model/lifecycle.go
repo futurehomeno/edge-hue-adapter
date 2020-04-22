@@ -14,12 +14,12 @@ const (
 	SystemEventTypeEvent = "EVENT"
 	SystemEventTypeState = "STATE"
 
-	StateConfiguring         = "CONFIGURING" // Brokers configured
-	StateConfigured          = "CONFIGURED" // Brokers configured
-	StateNotConfigured       = "NOT_CONFIGURED" // Brokers configured
-	StateRunning             = "RUNNING"
-	StateStartupError        = "STARTUP_ERROR"
-	StateTerminate           = "TERMINATE"
+	AppStateStarting      = "STARTING"
+	AppStateStartupError  = "STARTUP_ERROR"
+	AppStateNotConfigured = "NOT_CONFIGURED"
+	AppStateError         = "ERROR"
+	AppStateRunning       = "RUNNING"
+	AppStateTerminate     = "TERMINATING"
 
 	ConnStateConnecting      = "CONNECTING"
 	ConnStateConnected       = "CONNECTED"
@@ -33,12 +33,7 @@ const (
 	EventRunning             = "RUNNING"
 
 
-	AppStateStarting      = "STARTING"
-	AppStateStartupError  = "STARTUP_ERROR"
-	AppStateNotConfigured = "NOT_CONFIGURED"
-	AppStateError         = "ERROR"
-	AppStateRunning       = "RUNNING"
-	AppStateTerminate     = "TERMINATING"
+
 
 	ConfigStateNotConfigured = "NOT_CONFIGURED"
 	ConfigStateConfigured    = "CONFIGURED"
@@ -125,6 +120,7 @@ func (al *Lifecycle) ConfigState() State {
 }
 
 func (al *Lifecycle) SetConfigState(configState State) {
+	log.Debug("<sysEvt> New CONFIG state = ", configState)
 	al.configState = configState
 }
 
@@ -133,6 +129,7 @@ func (al *Lifecycle) AuthState() State {
 }
 
 func (al *Lifecycle) SetAuthState(authState State) {
+	log.Debug("<sysEvt> New AUTH state = ", authState)
 	al.authState = authState
 }
 
@@ -141,6 +138,7 @@ func (al *Lifecycle) ConnectionState() State {
 }
 
 func (al *Lifecycle) SetConnectionState(connectivityState State) {
+	log.Debug("<sysEvt> New CONNECTION state = ", connectivityState)
 	al.connectionState = connectivityState
 }
 
@@ -153,14 +151,13 @@ func (al *Lifecycle) SetAppState(currentState State, params map[string]string) {
 	al.busMux.Lock()
 	al.previousState = al.appState
 	al.appState = currentState
-	log.Debug("<sysEvt> New system state = ", currentState)
+	log.Debug("<sysEvt> New APP state = ", currentState)
 	for i := range al.systemEventBus {
 		select {
 		case al.systemEventBus[i] <- SystemEvent{Type: SystemEventTypeState, State: currentState, Info: "sys", Params: params}:
 		default:
 			log.Warnf("<sysEvt> State listener %s is busy , event dropped", i)
 		}
-
 	}
 	al.busMux.Unlock()
 }
@@ -205,14 +202,13 @@ func (al *Lifecycle) processEvent(event SystemEvent) {
 	switch event.Name {
 
 	case EventConfiguring:
-		al.SetAppState(StateConfiguring, nil)
+		al.SetConfigState(ConfigStateInProgress)
 
 	case EventConfigured:
-		al.SetAppState(StateConfigured, nil)
-		al.SetAppState(StateRunning, nil)
+		al.SetAppState(AppStateRunning, nil)
 
 	case EventConfigError:
-		al.SetAppState(StateNotConfigured, nil)
+		al.SetAppState(AppStateNotConfigured, nil)
 	}
 
 }

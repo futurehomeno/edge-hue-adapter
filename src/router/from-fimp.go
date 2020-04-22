@@ -55,6 +55,9 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 	addr := strings.Replace(newMsg.Addr.ServiceAddress, "_0", "", 1)
 	addr = strings.Replace(addr, "l", "", 1)
 	addrNum, err := strconv.Atoi(addr)
+	if newMsg.Payload.Service == "hue-ad" {
+		newMsg.Payload.Service = "hue"
+	}
 
 	switch newMsg.Payload.Service {
 	case "out_lvl_switch":
@@ -173,26 +176,6 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 		adr := &fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeAdapter, ResourceName: ServiceName, ResourceAddress: "1"}
 		log.Debug("New payload type ", newMsg.Payload.Type)
 		switch newMsg.Payload.Type {
-		case "cmd.auth.login":
-			reqVal, err := newMsg.Payload.GetStrMapValue()
-			status := "ok"
-			if err != nil {
-				log.Error("Incorrect login message ")
-				return
-			}
-			username, _ := reqVal["username"]
-			password, _ := reqVal["password"]
-			if username != "" && password != "" {
-
-			}
-			fc.configs.SaveToFile()
-			if err != nil {
-				status = "error"
-			}
-			msg := fimpgo.NewStringMessage("evt.system.login_report", ServiceName, status, nil, nil, newMsg.Payload)
-			if err := fc.mqt.RespondToRequest(newMsg.Payload, msg); err != nil {
-				fc.mqt.Publish(adr, msg)
-			}
 		case "cmd.system.sync":
 			lights, err := (*fc.bridge).GetLights()
 			if err != nil {
@@ -240,6 +223,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			fc.netService.SetDimmerMaxVal(fc.configs.DimmerMaxValue)
 		case "cmd.config.get_report" :
 			log.Info("Dimmer max value st = %d , ns = %d",fc.stateMonitor.DimmerMaxValue(),fc.netService.DimmerMaxVal())
+
 		case "cmd.log.set_level":
 			level , err :=newMsg.Payload.GetStringValue()
 			if err != nil {
@@ -268,8 +252,49 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			}
 			if mode == "manifest_state" {
 				manifest.AppState = *fc.appLifecycle.GetAllStates()
+				fc.configs.ConnectionState = string(fc.appLifecycle.ConnectionState())
+				fc.configs.Errors = fc.appLifecycle.LastError()
 				manifest.ConfigState = fc.configs
+
 			}
+			if errConf := manifest.GetAppConfig("errors");errConf !=nil {
+				if fc.configs.Errors == "" {
+					errConf.Hidden = true
+				}else {
+					errConf.Hidden = false
+				}
+			}
+
+			connectButton := manifest.GetButton("connect")
+			disconnectButton := manifest.GetButton("disconnect")
+			if connectButton !=nil && disconnectButton != nil {
+				if fc.appLifecycle.ConnectionState() == model.ConnStateConnected {
+					connectButton.Hidden = true
+					disconnectButton.Hidden = false
+				}else {
+					connectButton.Hidden = false
+					disconnectButton.Hidden = true
+				}
+			}
+			if syncButton := manifest.GetButton("sync");syncButton !=nil {
+				if fc.appLifecycle.ConnectionState() == model.ConnStateConnected {
+					syncButton.Hidden = false
+				}else {
+					syncButton.Hidden = true
+				}
+			}
+			connBlock := manifest.GetUIBlock("connect")
+			settingsBlock := manifest.GetUIBlock("settings")
+			if connBlock != nil && settingsBlock !=nil{
+				if fc.configs.BridgeId != "" || fc.configs.DiscoveredBridges != "" {
+					connBlock.Hidden = false
+					settingsBlock.Hidden = false
+				}else {
+					connBlock.Hidden = true
+					settingsBlock.Hidden = true
+				}
+			}
+
 			msg := fimpgo.NewMessage("evt.app.manifest_report",ServiceName,fimpgo.VTypeObject,manifest,nil,nil,newMsg.Payload)
 			if err := fc.mqt.RespondToRequest(newMsg.Payload,msg); err != nil {
 				// if response topic is not set , sending back to default application event topic
@@ -277,15 +302,14 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			}
 
 		case "cmd.config.extended_set":
-			reqVal, err := newMsg.Payload.GetStrMapValue()
+			conf := model.Configs{}
+			err := newMsg.Payload.GetObjectValue(&conf)
 			if err != nil {
 				log.Error("Incorrect extended set message ")
 				return
 			}
-			host, _ := reqVal["host"]
-			username, _ := reqVal["username"]
-			//syncMode, _ := reqVal["sync_mode"]
-			dimmerRange, _ := reqVal["dimmer_range_mode"]
+			username := conf.Username
+			dimmerRange := conf.DimmerRangeMode
 			if dimmerRange == "100" {
 				fc.configs.DimmerRangeMode = dimmerRange
 				fc.configs.DimmerMaxValue = 100
@@ -298,13 +322,10 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			if username == "" {
 				username = "thingsplex"
 			}
-			bridgeId, ok := reqVal["bridge_id"]
-			if !ok {
-				log.Error("Incorrect bridge id")
-			}
+			bridgeId := conf.BridgeId
 			fc.configs.BridgeId = bridgeId
 			fc.configs.Username = username
-			fc.configs.Host = host
+			fc.configs.Host = conf.Host
 			fc.configs.SaveToFile()
 
 			configReport := model.ConfigReport{
@@ -344,11 +365,12 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				Operation:       "cmd.bridge.connect",
 				OperationStatus: strings.ToUpper(status),
 				Next:            "reload",
-				ErrorCode:       "E1",
+				ErrorCode:       "",
 				ErrorText:       errStr,
 			}
 			if status == "ok" {
 				fc.appLifecycle.SetConnectionState(model.ConnStateConnected)
+				fc.appLifecycle.SetConfigState(model.ConfigStateConfigured)
 				fc.appLifecycle.SetAppState(model.AppStateRunning,nil)
 			}else {
 				fc.appLifecycle.SetLastError(errStr)
@@ -357,6 +379,25 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			if err := fc.mqt.RespondToRequest(newMsg.Payload,msg); err != nil {
 				fc.mqt.Publish(adr,msg)
 			}
+
+		case "cmd.bridge.disconnect":
+			val := model.ButtonActionResponse{
+				Operation:       "cmd.bridge.disconnect",
+				OperationStatus: "OK",
+				Next:            "reload",
+				ErrorCode:       "",
+				ErrorText:       "",
+			}
+			fc.stateMonitor.Stop()
+			fc.configs.LoadDefaults()
+			fc.appLifecycle.SetConnectionState(model.ConnStateDisconnected)
+			fc.appLifecycle.SetConfigState(model.ConfigStateNotConfigured)
+			fc.appLifecycle.SetAppState(model.AppStateNotConfigured,nil)
+			msg := fimpgo.NewMessage("evt.app.config_action_report",ServiceName,fimpgo.VTypeObject,val,nil,nil,newMsg.Payload)
+			if err := fc.mqt.RespondToRequest(newMsg.Payload,msg); err != nil {
+				fc.mqt.Publish(adr,msg)
+			}
+			//TODO : send exclusion reports
 
 		case "cmd.bridge.discover":
 			discoveryReport,err := fc.discoverBridge()
@@ -374,7 +415,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				Operation:       "cmd.bridge.connect",
 				OperationStatus: status,
 				Next:            "reload",
-				ErrorCode:       "E1",
+				ErrorCode:       "",
 				ErrorText:       errStr,
 			}
 			msg := fimpgo.NewMessage("evt.app.config_action_report",ServiceName,fimpgo.VTypeObject,val,nil,nil,newMsg.Payload)

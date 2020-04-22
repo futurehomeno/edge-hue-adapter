@@ -32,9 +32,7 @@ func main() {
 
 	utils.SetupLog(configs.LogFile, configs.LogLevel, configs.LogFormat)
 	log.Info("--------------Starting hue-ad----------------")
-	appLifecycle.PublishEvent(model.EventConfiguring, "main", nil)
-	appLifecycle.SetConnectionState(model.ConnStateDisconnected)
-
+	appLifecycle.SetAppState(model.AppStateStarting,nil)
 	mqtt := fimpgo.NewMqttTransport(configs.MqttServerURI, configs.MqttClientIdPrefix, configs.MqttUsername, configs.MqttPassword, true, 1, 1)
 	err = mqtt.Start()
 	responder := discovery.NewServiceDiscoveryResponder(mqtt)
@@ -49,57 +47,66 @@ func main() {
 	fimpRouter := router.NewFromFimpRouter(mqtt,appLifecycle,configs,bridge,stateMonitor)
 	fimpRouter.Start()
 
+	appLifecycle.SetConnectionState(model.ConnStateDisconnected)
 	if configs.IsConfigured() && err == nil {
 		appLifecycle.SetConfigState(model.ConfigStateConfigured)
-		appLifecycle.PublishEvent(model.EventConfigured,"service",nil)
+		appLifecycle.SetAppState(model.AppStateRunning,nil)
 	}else {
 		appLifecycle.SetAppState(model.AppStateNotConfigured,nil)
+		appLifecycle.SetConfigState(model.ConfigStateNotConfigured)
 	}
+
     var br []huego.Bridge
 	var retryCounter int
 	for {
-		appLifecycle.WaitForState("main", model.StateRunning)
-		retryCounter = 0
-		for {
-			appLifecycle.SetConnectionState(model.ConnStateConnecting)
-			br , err = huego.DiscoverAll()
-			if err == nil {
-				break
-			}else {
-				log.Error("Can't discover the bridge. retrying... ",err)
-				retryCounter++
-				if retryCounter > 10 {
-					break
-				}
-				time.Sleep(time.Second*5*time.Duration(retryCounter))
-			}
-		}
-
-		if err == nil {
-			for _,b := range br {
-				if b.ID == configs.BridgeId {
-					*bridge = &b
-				}
-			}
-			if (*bridge).ID != "" {
-				log.Infof("Bridge discovered on address = %s , id = %s", (*bridge).Host,(*bridge).ID)
-				(*bridge).Login(configs.Token)
-				err = stateMonitor.TestConnection()
-				if err != nil {
-					appLifecycle.SetConnectionState(model.ConnStateDisconnected)
-					appLifecycle.SetLastError(err.Error())
-				}else {
-					appLifecycle.SetConnectionState(model.ConnStateConnected)
-				}
-				stateMonitor.Start()
-			}else {
-				log.Info("Adapter is not configured")
-				appLifecycle.PublishEvent(model.EventConfiguring, "main", nil)
-			}
+		// At this point application mightn not be configured and the app is waiting for user actions
+		appLifecycle.WaitForState("main", model.AppStateRunning)
+		if appLifecycle.ConnectionState() == model.ConnStateConnected{
+			stateMonitor.Start()
 		}else {
+			retryCounter = 0
+			for {
+				appLifecycle.SetConnectionState(model.ConnStateConnecting)
+				br , err = huego.DiscoverAll()
+				if err == nil {
+					break
+				}else {
+					log.Error("Can't discover the bridge. retrying... ",err)
+					retryCounter++
+					if retryCounter > 10 {
+						break
+					}
+					time.Sleep(time.Second*5*time.Duration(retryCounter))
+				}
+			}
 
+			if err == nil {
+				for _,b := range br {
+					if b.ID == configs.BridgeId {
+						*bridge = &b
+					}
+				}
+				if (*bridge).ID != "" {
+					log.Infof("Bridge discovered on address = %s , id = %s", (*bridge).Host,(*bridge).ID)
+					(*bridge).Login(configs.Token)
+					err = stateMonitor.TestConnection()
+					if err != nil {
+						appLifecycle.SetConnectionState(model.ConnStateDisconnected)
+						appLifecycle.SetLastError(err.Error())
+					}else {
+						appLifecycle.SetConnectionState(model.ConnStateConnected)
+						stateMonitor.Start()
+					}
+
+				}else {
+					log.Info("Adapter is not configured")
+					appLifecycle.SetAppState(model.AppStateNotConfigured,nil)
+				}
+			}else {
+				appLifecycle.SetAppState(model.AppStateStartupError,nil)
+			}
 		}
-		appLifecycle.WaitForState("main", model.StateConfiguring)
+		appLifecycle.WaitForState("main", model.AppStateNotConfigured)
 	}
 
 	mqtt.Stop()

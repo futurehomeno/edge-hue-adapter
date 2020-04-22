@@ -26,18 +26,19 @@ type AppConfig struct {
 	Val         Value             `json:"val"`
 	IsRequired  bool              `json:"is_required"`
 	ConfigPoint string            `json:"config_point"`
+	Hidden      bool              `json:"hidden"` //
 }
 
 type MultilingualLabel map[string]string
 
 type AppAuth struct {
-	Type         string `json:"type"`
+	Type                  string `json:"type"`
 	CodeGrantLoginPageUrl string `json:"code_grant_login_page_url"`
-	RedirectURL  string `json:"redirect_url"`
-	ClientID     string `json:"client_id"`
-	Secret       string `json:"secret"`
-	PartnerID    string `json:"partner_id"`
-	AuthEndpoint string `json:"auth_endpoint"`
+	RedirectURL           string `json:"redirect_url"`
+	ClientID              string `json:"client_id"`
+	Secret                string `json:"secret"`
+	PartnerID             string `json:"partner_id"`
+	AuthEndpoint          string `json:"auth_endpoint"`
 }
 
 type AppService struct {
@@ -64,7 +65,7 @@ type UIButton struct {
 		IntfT string `json:"intf_t"`
 		Val   string `json:"val"`
 	} `json:"req"`
-	ReloadConfig bool `json:"reload_config"`
+	Hidden       bool `json:"hidden"`
 }
 
 type ButtonActionResponse struct {
@@ -76,11 +77,13 @@ type ButtonActionResponse struct {
 }
 
 type AppUBLock struct {
+	ID      string            `json:"id"`
 	Header  MultilingualLabel `json:"header"`
 	Text    MultilingualLabel `json:"text"`
 	Configs []string          `json:"configs"`
 	Buttons []string          `json:"buttons"`
 	Footer  MultilingualLabel `json:"footer"`
+	Hidden  bool              `json:"hidden"`
 }
 
 func NewManifest() *Manifest {
@@ -116,6 +119,36 @@ func (m *Manifest) SaveToFile(filePath string) error {
 	}
 	return nil
 }
+
+func (m *Manifest) GetUIBlock(id string)*AppUBLock {
+	for i:=range m.UIBlocks {
+		if m.UIBlocks[i].ID == id {
+			return &m.UIBlocks[i]
+		}
+	}
+	return nil
+}
+
+func (m *Manifest) GetButton(id string)*UIButton {
+	for i:=range m.UIButtons {
+		if m.UIButtons[i].ID == id {
+			return &m.UIButtons[i]
+		}
+	}
+	return nil
+}
+
+func (m *Manifest) GetAppConfig(id string)*AppConfig {
+	for i:=range m.Configs {
+		if m.Configs[i].ID == id {
+			return &m.Configs[i]
+		}
+	}
+	return nil
+}
+
+
+
 
 //func (m *Manifest) ConfigureServices() {
 //	adInterfaces := []fimptype.Interface{{

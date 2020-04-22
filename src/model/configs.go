@@ -33,6 +33,9 @@ type Configs struct {
 	DimmerMaxValue       int           `json:"-"`
 	WorkDir              string        `json:"-"`
 	DiscoveredBridges    string        `json:"discovered_bridges"`
+	// This is temp solution for better UI interaction
+	ConnectionState      string        `json:"connection_state"`
+	Errors               string        `json:"errors"`
 
 }
 

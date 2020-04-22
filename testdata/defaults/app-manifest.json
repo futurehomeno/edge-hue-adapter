@@ -5,7 +5,7 @@
       "label": {"en": "IP or host name of Hue bridge"},
       "val_t": "string",
       "ui": {
-        "type": "string"
+        "type": "input_string"
       },
       "val": {
         "default": ""
@@ -18,7 +18,33 @@
       "label": {"en": "Bridge id"},
       "val_t": "string",
       "ui": {
-        "type": "string"
+        "type": "input_string"
+      },
+      "val": {
+        "default": ""
+      },
+      "is_required": true,
+      "config_point": "any"
+    },
+    {
+      "id": "connection_state",
+      "label": {"en": "State"},
+      "val_t": "string",
+      "ui": {
+        "type": "text"
+      },
+      "val": {
+        "default": ""
+      },
+      "is_required": true,
+      "config_point": "any"
+    },
+    {
+      "id": "errors",
+      "label": {"en": "Errors"},
+      "val_t": "string",
+      "ui": {
+        "type": "text_error"
       },
       "val": {
         "default": ""
@@ -31,7 +57,7 @@
       "label": {"en": "List of discovered bridges"},
       "val_t": "string",
       "ui": {
-        "type": "readonly"
+        "type": "input_readonly"
       },
       "val": {
         "default": ""
@@ -44,11 +70,11 @@
       "label": {"en": "Dimmer mode "},
       "val_t": "str_map",
       "ui": {
-        "type": "select",
+        "type": "select_horizontal",
         "select": [{"val": "100","label": {"en": "Range 0-100"}},{"val": "255","label": {"en": "Range 0-255"}}]
       },
       "val": {
-        "default": ["255"]
+        "default": "255"
       },
       "is_required": true,
       "config_point": "init"
@@ -63,7 +89,16 @@
         "intf_t": "cmd.bridge.connect",
         "val": ""
       },
-      "reload_config": true
+      "hidden": false
+    }, {
+      "id":"disconnect",
+      "label": {"en": "Disconnect"},
+      "req": {
+        "serv":"hue",
+        "intf_t": "cmd.bridge.disconnect",
+        "val": ""
+      },
+      "hidden": false
     },{
       "id":"sync",
       "label": {"en": "Re-sync devices"},
@@ -72,7 +107,7 @@
         "intf_t": "cmd.system.sync",
         "val": ""
       },
-      "reload_config": true
+      "hidden": false
     },{
       "id":"discover",
       "label": {"en": "Discover Hue bridge"},
@@ -81,30 +116,33 @@
         "intf_t": "cmd.bridge.discover",
         "val": ""
       },
-      "reload_config": true
+      "hidden": false
     }
-
 
   ],
   "ui_blocks": [
     {
+      "id":"connect",
       "header": {"en": "Hue bridge connection"},
       "text": {"en": "Press HUE link button right before connecting to the bridge"},
-      "configs": ["host","bridge_id"],
-      "buttons": ["connect"],
+      "configs": ["host","bridge_id","connection_state","errors"],
+      "buttons": ["connect","disconnect"],
       "footer": {"en": ""}
     },
     {
-      "header": {"en": "App settings "},
-      "text": {"en": ""},
-      "configs": ["dimmer_range_mode"],
-      "buttons": ["sync"],
-      "footer": {"en": ""}
-    }, {
+      "id":"discover",
       "header": {"en": "Discover HUE bridge "},
       "text": {"en": "The app will try to discover new bridge"},
       "configs": ["discovered_bridges"],
       "buttons": ["discover"],
+      "footer": {"en": ""}
+    },
+    {
+      "id": "settings",
+      "header": {"en": "App settings "},
+      "text": {"en": ""},
+      "configs": ["dimmer_range_mode"],
+      "buttons": ["sync"],
       "footer": {"en": ""}
     }
   ],
