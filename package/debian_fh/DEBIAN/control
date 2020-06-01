@@ -1,8 +1,0 @@
-Package: hue-ad
-Version: 0.1.1
-Replaces: hue-ad
-Section: non-free/misc
-Priority: optional
-Architecture: armhf
-Maintainer: Aleksandrs Livincovs <aleksandrs.livincovs@gmail.com>
-Description: .

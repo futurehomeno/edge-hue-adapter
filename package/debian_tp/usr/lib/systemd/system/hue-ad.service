@@ -3,7 +3,7 @@ Description=hue-ad
 
 [Service]
 Type=simple
-ExecStart=/opt/thingsplex/hue-ad/hue-ad -c config.json
+ExecStart=/opt/thingsplex/hue-ad/hue-ad
 User=hue-ad
 WorkingDirectory=/opt/thingsplex/hue-ad
 Restart=always

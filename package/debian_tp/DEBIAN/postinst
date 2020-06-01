@@ -7,8 +7,8 @@ then
   groupadd -r hue-ad || true
 
   useradd -r -N -M -d / -s /bin/false -g thingsplex hue-ad || true
-  if [ ! -f /opt/thingsplex/hue-ad/config.json ]; then
-		  cp /opt/thingsplex/hue-ad/defaults/config.json /opt/thingsplex/hue-ad/config.json || true
+  if [ ! -f /opt/thingsplex/hue-ad/data/config.json ]; then
+		  cp /opt/thingsplex/hue-ad/defaults/config.json /opt/thingsplex/hue-ad/data/config.json || true
 	fi
   chown -R hue-ad:thingsplex /var/log/thingsplex/hue-ad/ || true
   chown -R hue-ad:hue-ad /opt/thingsplex/hue-ad/ || true
@@ -19,7 +19,7 @@ fi
 deb-systemd-helper unmask hue-ad.service >/dev/null || true
 
 if deb-systemd-helper --quiet was-enabled hue-ad.service; then
-  deb-systemd-helper enable hue-ad.service >/dev/null || true
+  systemctl enable hue-ad.service || true
 else
   deb-systemd-helper update-state hue-ad.service >/dev/null || true
 fi
