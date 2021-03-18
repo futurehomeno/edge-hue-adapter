@@ -255,8 +255,8 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				fc.configs.ConnectionState = string(fc.appLifecycle.ConnectionState())
 				fc.configs.Errors = fc.appLifecycle.LastError()
 				manifest.ConfigState = fc.configs
-
 			}
+
 			if errConf := manifest.GetAppConfig("errors");errConf !=nil {
 				if fc.configs.Errors == "" {
 					errConf.Hidden = true
@@ -329,7 +329,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			fc.configs.SaveToFile()
 
 			configReport := model.ConfigReport{
-				OpStatus: "OK",
+				OpStatus: "ok",
 				AppState:  *fc.appLifecycle.GetAllStates(),
 			}
 			fc.appLifecycle.SetConfigState(model.ConfigStateConfigured)
@@ -363,7 +363,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			status,errStr := fc.connectToBridge(fc.configs.BridgeId,"thingsplex",fc.configs.Host,"full")
 			val := model.ButtonActionResponse{
 				Operation:       "cmd.bridge.connect",
-				OperationStatus: strings.ToUpper(status),
+				OperationStatus: status,
 				Next:            "reload",
 				ErrorCode:       "",
 				ErrorText:       errStr,
@@ -383,7 +383,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 		case "cmd.bridge.disconnect":
 			val := model.ButtonActionResponse{
 				Operation:       "cmd.bridge.disconnect",
-				OperationStatus: "OK",
+				OperationStatus: "ok",
 				Next:            "reload",
 				ErrorCode:       "",
 				ErrorText:       "",
@@ -401,10 +401,10 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 
 		case "cmd.bridge.discover":
 			discoveryReport,err := fc.discoverBridge()
-			status := "OK"
+			status := "ok"
 			errStr := ""
 			if err !=nil {
-				status = "ERROR"
+				status = "error"
 				errStr = err.Error()
 			}else {
 				fc.configs.DiscoveredBridges,_ = discoveryReport["discovered"]

@@ -72,6 +72,8 @@ func (st *StateMonitor) monitor() {
 		  if err != nil {
 			log.Debugf("Adapter can't get sensors from hue hub . Err ",err)
 		  	time.Sleep(time.Second*30)
+			//TODO : If error contains "connection refused" retry 5 times and try to rediscover the bridge .
+			//  Adapter can't get sensors from hue hub . Err %!(EXTRA *url.Error=Get "http://10.0.0.7/api/UdiMa3MbRLk36LChfJ3qA-zyyx0DKEptjv-pk3Nk/sensors": dial tcp 10.0.0.7:80: connect: connection refused)
 			continue
 		  }
 		  st.processSensors(sensors)
