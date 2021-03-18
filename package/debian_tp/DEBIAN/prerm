@@ -4,4 +4,6 @@ set -e
 if [ -d /run/systemd/system ] && [ "$1" = remove ]; then
   deb-systemd-invoke stop hue-ad.service >/dev/null
   systemctl disable hue-ad.service || true
+  rm /opt/thingsplex/hue-ad/data* || true
+  rm /var/log/thingsplex/hue-ad/* || true
 fi
