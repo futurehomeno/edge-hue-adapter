@@ -265,17 +265,6 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				}
 			}
 
-			connectButton := manifest.GetButton("connect")
-			disconnectButton := manifest.GetButton("disconnect")
-			if connectButton != nil && disconnectButton != nil {
-				if fc.appLifecycle.ConnectionState() == model.ConnStateConnected {
-					connectButton.Hidden = true
-					disconnectButton.Hidden = false
-				} else {
-					connectButton.Hidden = false
-					disconnectButton.Hidden = true
-				}
-			}
 			if syncButton := manifest.GetButton("sync"); syncButton != nil {
 				if fc.appLifecycle.ConnectionState() == model.ConnStateConnected {
 					syncButton.Hidden = false
@@ -287,11 +276,27 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			settingsBlock := manifest.GetUIBlock("settings")
 			if connBlock != nil && settingsBlock != nil {
 				if fc.configs.BridgeId != "" || fc.configs.DiscoveredBridges != "" {
-					connBlock.Hidden = false
-					settingsBlock.Hidden = false
+					connBlock.Hidden = true
+					settingsBlock.Hidden = true
 				} else {
 					connBlock.Hidden = true
 					settingsBlock.Hidden = true
+				}
+			}
+
+			listBlock := manifest.GetUIBlock("list")
+			listConfig := manifest.GetAppConfig("discovered_bridges_test")
+			var bridgeSelect []interface{}
+			if listBlock != nil {
+				if fc.configs.DiscoveredBridgesList != nil {
+					for _, bridge := range fc.configs.DiscoveredBridgesList {
+						name := bridge[len(bridge)-6:]
+						bridgeSelect = append(bridgeSelect, map[string]interface{}{"val": bridge, "label": map[string]interface{}{"en": name}})
+					}
+					listConfig.UI.Select = bridgeSelect
+					listBlock.Hidden = false
+				} else {
+					listBlock.Hidden = true
 				}
 			}
 
@@ -322,14 +327,31 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 			if username == "" {
 				username = "thingsplex"
 			}
-			bridgeId := conf.BridgeId
-			fc.configs.BridgeId = bridgeId
+			// bridgeId := conf.BridgeId
+			hostandid := strings.Split(conf.DiscoveredBridgesTest, ", ")
+			host := hostandid[0]
+			id := hostandid[1]
+			fc.configs.BridgeId = id
 			fc.configs.Username = username
-			fc.configs.Host = conf.Host
+			fc.configs.Host = host
 			fc.configs.SaveToFile()
 
+			var status string
+			if host != "" && id != "" {
+				err := fc.stateMonitor.TestConnection()
+				if err == nil {
+					status = "ok"
+					log.Warn("Already connected. Connection request skipped")
+				} else {
+					log.Info("Connecting to bridge with host: ", fc.configs.Host, " and ID: ", fc.configs.BridgeId, ".")
+					status, _ = fc.connectToBridge(fc.configs.BridgeId, "futurehome", fc.configs.Host, "full")
+				}
+			} else {
+				status = "ok"
+			}
+
 			configReport := model.ConfigReport{
-				OpStatus: "ok",
+				OpStatus: status,
 				AppState: *fc.appLifecycle.GetAllStates(),
 			}
 			fc.appLifecycle.SetConfigState(model.ConfigStateConfigured)
@@ -407,17 +429,22 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				status = "error"
 				errStr = err.Error()
 			} else {
+				fc.configs.DiscoveredBridges = ""
+				fc.configs.Host = ""
+				fc.configs.BridgeId = ""
 				fc.configs.DiscoveredBridges, _ = discoveryReport["discovered"]
 				fc.configs.Host, _ = discoveryReport["host"]
 				fc.configs.BridgeId, _ = discoveryReport["bridge_id"]
 			}
 			val := model.ButtonActionResponse{
-				Operation:       "cmd.bridge.connect",
+				Operation:       "cmd.bridge.discover",
 				OperationStatus: status,
 				Next:            "reload",
 				ErrorCode:       "",
 				ErrorText:       errStr,
 			}
+
+			fc.configs.SaveToFile()
 			msg := fimpgo.NewMessage("evt.app.config_action_report", ServiceName, fimpgo.VTypeObject, val, nil, nil, newMsg.Payload)
 			if err := fc.mqt.RespondToRequest(newMsg.Payload, msg); err != nil {
 				fc.mqt.Publish(adr, msg)
@@ -599,9 +626,15 @@ func (fc *FromFimpRouter) connectToBridge(bridgeId, username, host, syncMode str
 	br, err := huego.DiscoverAll()
 	var found bool
 	for _, b := range br {
+		log.Debug("b.ID: ", b.ID)
+		log.Debug("b.Host: ", b.Host)
 		if b.ID == bridgeId {
+			log.Info("Found = true")
 			*fc.bridge = &b
 			found = true
+			break
+		} else {
+			log.Info("Found = false")
 		}
 	}
 
@@ -613,7 +646,7 @@ func (fc *FromFimpRouter) connectToBridge(bridgeId, username, host, syncMode str
 			status = "error"
 			errStr = err.Error()
 		} else {
-			log.Info("User added", token)
+			log.Info("User added ", token)
 			fc.configs.Token = token
 			fc.configs.BridgeId = bridgeId
 			fc.appLifecycle.PublishEvent(model.EventConfigured, "from-fimp-router", nil)
@@ -672,7 +705,7 @@ func (fc *FromFimpRouter) connectToBridge(bridgeId, username, host, syncMode str
 		fc.appLifecycle.SetConnectionState(model.ConnStateDisconnected)
 		fc.appLifecycle.SetLastError(errStr)
 	}
-	return
+	return status, errStr
 }
 
 func (fc *FromFimpRouter) discoverBridge() (map[string]string, error) {
@@ -680,17 +713,42 @@ func (fc *FromFimpRouter) discoverBridge() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var discoverdIds, discoveredIps, bridgeId string
+	var discoveredIds, discoveredIps, bridgeId string
 	if len(br) == 1 {
-		discoverdIds = br[0].ID
+		discoveredIds = br[0].ID
 		discoveredIps = br[0].Host
 		bridgeId = br[0].ID
 	} else {
 		for _, b := range br {
-			discoverdIds = discoverdIds + "," + b.ID
-			discoveredIps = discoveredIps + "," + b.Host
+			if discoveredIds == "" {
+				discoveredIds = b.ID
+			} else {
+				discoveredIds = discoveredIds + "," + b.ID
+			}
+			if discoveredIps == "" {
+				discoveredIps = b.Host
+			} else {
+				discoveredIps = discoveredIps + "," + b.Host
+			}
 		}
 	}
-	return map[string]string{"host": discoveredIps, "username": "thingsplex", "sync_mode": "lights", "bridge_id": bridgeId, "discovered": discoverdIds,
+	ips := strings.Split(discoveredIps, ",")
+	ids := strings.Split(discoveredIds, ",")
+	for i := range ips {
+		add := true
+		for p := 0; p < len(fc.configs.DiscoveredBridgesList); p++ {
+			check := strings.Split(fc.configs.DiscoveredBridgesList[p], ", ")
+			if check[0] == ips[i] {
+				add = false
+			}
+		}
+		if add {
+			fc.configs.DiscoveredBridgesList = append(fc.configs.DiscoveredBridgesList, ips[i]+", "+ids[i])
+		}
+	}
+
+	// fc.configs.DiscoveredBridgesList = strings.Split(discoveredIps, ",")
+
+	return map[string]string{"host": discoveredIps, "username": "thingsplex", "sync_mode": "lights", "bridge_id": bridgeId, "discovered": discoveredIds,
 		"instructions": "press hue link button first", "dimmer_range_mode": fc.configs.DimmerRangeMode}, nil
 }

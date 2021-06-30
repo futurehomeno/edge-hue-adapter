@@ -1,4 +1,4 @@
-version="0.3.1"
+version="0.3.2"
 version_file=VERSION
 working_dir=$(shell pwd)
 arch="armhf"
@@ -51,6 +51,6 @@ remote-install : upload
 deb-remote-install : deb-arm remote-install
 	@echo "Installed"
 run :
-	cd ./src; go run service.go -c testdata/config.json;cd ../
+	cd ./src; go run service.go -c testdata;cd ../
 
 .phony : clean
