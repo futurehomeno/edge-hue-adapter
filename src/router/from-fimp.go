@@ -308,6 +308,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 
 		case "cmd.config.extended_set":
 			conf := model.Configs{}
+			// operror := ""
 			err := newMsg.Payload.GetObjectValue(&conf)
 			if err != nil {
 				log.Error("Incorrect extended set message ")
@@ -352,6 +353,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 
 			configReport := model.ConfigReport{
 				OpStatus: status,
+				OpError:  fc.appLifecycle.LastError(),
 				AppState: *fc.appLifecycle.GetAllStates(),
 			}
 			fc.appLifecycle.SetConfigState(model.ConfigStateConfigured)

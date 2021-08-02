@@ -127,5 +127,6 @@ func (cf *Configs) LoadDefaults() error {
 
 type ConfigReport struct {
 	OpStatus string    `json:"op_status"`
+	OpError  string    `json:"op_error"`
 	AppState AppStates `json:"app_state"`
 }
