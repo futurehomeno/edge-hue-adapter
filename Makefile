@@ -33,6 +33,8 @@ package-tar:
 package-deb-doc-tp:
 	@echo "Packaging application as Thingsplex debian package"
 	chmod a+x package/debian_tp/DEBIAN/*
+	mkdir -p package/debian_tp/var/log/thingsplex/hue-ad package/debian_tp/usr/bin
+	mkdir -p package/build
 	cp ./src/hue-ad package/debian_tp/opt/thingsplex/hue-ad
 	cp VERSION package/debian_tp/opt/thingsplex/hue-ad
 	docker run --rm -v ${working_dir}:/build -w /build --name debuild debian dpkg-deb --build package/debian_tp
