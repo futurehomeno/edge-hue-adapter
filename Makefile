@@ -1,19 +1,22 @@
-version="0.3.2"
 version_file=VERSION
 working_dir=$(shell pwd)
 arch="armhf"
+version:=`git describe --tags | cut -c 2-`
 remote_host = "fh@cube.local"
 
 clean:
-	-rm hue-ad
+	-rm ./src/hue-ad
+
+init:
+	git config core.hooksPath .githooks
 
 build-go:
 	cd ./src;go build -o hue-ad service.go;cd ../
 
-build-go-arm:
+build-go-arm: init
 	cd ./src;GOOS=linux GOARCH=arm GOARM=6 go build -ldflags="-s -w" -o hue-ad service.go;cd ../
 
-build-go-amd:
+build-go-amd: init
 	cd ./src;GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o hue-ad service.go;cd ../
 
 
@@ -25,7 +28,7 @@ configure-amd64:
 
 
 package-tar:
-	tar cvzf hue-ad_$(version).tar.gz hue-ad VERSION
+	tar cvzf hue-ad_$(version).tar.gz hue-ad $(version_file)
 
 package-deb-doc-tp:
 	@echo "Packaging application as Thingsplex debian package"
@@ -40,7 +43,7 @@ deb-arm : clean configure-arm build-go-arm package-deb-doc-tp
 	mv package/debian_tp.deb package/build/hue-ad_$(version)_armhf.deb
 
 deb-amd : configure-amd64 build-go-amd package-deb-doc-tp
-	mv debian.deb hue-ad_$(version)_amd64.deb
+	mv debian.deb package/build/hue-ad_$(version)_amd64.deb
 
 upload :
 	scp package/build/hue-ad_$(version)_armhf.deb $(remote_host):~/

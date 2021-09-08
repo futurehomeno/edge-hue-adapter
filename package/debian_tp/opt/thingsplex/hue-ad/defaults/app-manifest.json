@@ -71,7 +71,7 @@
     },
     {
       "id": "discovered_bridges_test",
-      "label": {"en": "List of discovered bridges TEST"},
+      "label": {"en": "Press HUE link button right before connecting to the bridge"},
       "val_t": "bool",
       "ui": {
         "type": "list_radio",
@@ -165,11 +165,11 @@
     },
     {
       "id": "list",
-      "header": {"en": "List of discovered bridges TEST"},
-      "text": {"en": "Press HUE link button right before connecting to the bridge"},
+      "header": {"en": "List of discovered bridges"},
+      "text": {"en": ""},
       "configs": ["discovered_bridges_test"],
       "buttons": ["sync"],
-      "footer": {"en": ""}
+      "footer": {"en": "Press HUE link button right before connecting to the bridge"}
     }
   ],
   "auth": {

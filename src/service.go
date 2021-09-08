@@ -52,9 +52,11 @@ func main() {
 	if configs.IsConfigured() && err == nil {
 		appLifecycle.SetConfigState(model.ConfigStateConfigured)
 		appLifecycle.SetAppState(model.AppStateRunning, nil)
+		appLifecycle.SetConnectionState(model.ConnStateConnected)
 	} else {
 		appLifecycle.SetAppState(model.AppStateNotConfigured, nil)
 		appLifecycle.SetConfigState(model.ConfigStateNotConfigured)
+		appLifecycle.SetConnectionState(model.ConnStateDisconnected)
 	}
 
 	var br []huego.Bridge

@@ -345,7 +345,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 					log.Warn("Already connected. Connection request skipped")
 				} else {
 					log.Info("Connecting to bridge with host: ", fc.configs.Host, " and ID: ", fc.configs.BridgeId, ".")
-					status, _ = fc.connectToBridge(fc.configs.BridgeId, "futurehome", fc.configs.Host, "full")
+					status, _ = fc.connectToBridge(fc.configs.BridgeId, "thingsplex", fc.configs.Host, "full")
 				}
 			} else {
 				status = "ok"
