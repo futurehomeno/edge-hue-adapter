@@ -555,32 +555,9 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 				}
 			}()
 		case "cmd.thing.delete":
-			// remove device from network
-			val, err := newMsg.Payload.GetStrMapValue()
-			if err != nil {
-				log.Error("Wrong msg format")
-				return
-			}
-			deviceId, ok := val["address"]
-			deviceId = strings.Replace(deviceId, "l", "", 1)
-			if ok {
-				addr, err := strconv.Atoi(deviceId)
-				if err != nil {
-					return
-				}
-				err = (*fc.bridge).DeleteLight(addr)
-				if err != nil {
-					log.Error("Failed to delete resource ", err)
-					return
-				}
-				exclReport := map[string]string{"address": deviceId}
-				msg := fimpgo.NewMessage("evt.thing.exclusion_report", ServiceName, fimpgo.VTypeObject, exclReport, nil, nil, nil)
-				adr := fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeAdapter, ResourceName: "hue", ResourceAddress: "1"}
-				fc.mqt.Publish(&adr, msg)
-				log.Info(deviceId)
-			} else {
+			// remove device from futurehome app
+			if err := fc.netService.SendExclusionReport(newMsg); err != nil {
 				log.Error("Incorrect address")
-
 			}
 
 		case "cmd.state.get_full_report":
