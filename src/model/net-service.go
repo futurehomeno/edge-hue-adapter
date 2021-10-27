@@ -64,17 +64,16 @@ func (ns *NetworkService) SendExclusionReport(oldMsg *fimpgo.Message) error {
 	}
 
 	deviceID, ok := val["address"]
-	deviceID = strings.Replace(deviceID, "l", "", 1)
-	if ok {
-		exclReport := map[string]string{"address": deviceID}
-		msg := fimpgo.NewMessage("evt.thing.exclusion_report", "hue", fimpgo.VTypeObject, exclReport, nil, nil, nil)
-		adr := fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeAdapter, ResourceName: "hue", ResourceAddress: "1"}
-		ns.mqt.Publish(&adr, msg)
-		log.Debug("Device with deviceID ", deviceID, " excluded.")
-		return nil
+	if !ok {
+		return errors.New("could not get address value")
 	}
-
-	return errors.New("Could not get address value.")
+	deviceID = strings.Replace(deviceID, "l", "", 1)
+	exclReport := map[string]string{"address": deviceID}
+	msg := fimpgo.NewMessage("evt.thing.exclusion_report", "hue", fimpgo.VTypeObject, exclReport, nil, nil, nil)
+	adr := fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeAdapter, ResourceName: "hue", ResourceAddress: "1"}
+	ns.mqt.Publish(&adr, msg)
+	log.Debug("Device with deviceID ", deviceID, " excluded.")
+	return nil
 }
 
 func (ns *NetworkService) SendInclusionReport(nodeId string) error {

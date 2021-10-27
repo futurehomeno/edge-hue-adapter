@@ -557,7 +557,7 @@ func (fc *FromFimpRouter) routeFimpMessage(newMsg *fimpgo.Message) {
 		case "cmd.thing.delete":
 			// remove device from futurehome app
 			if err := fc.netService.SendExclusionReport(newMsg); err != nil {
-				log.Error("Incorrect address")
+				log.Error("Error when sending exclusion report: ", err)
 			}
 
 		case "cmd.state.get_full_report":
