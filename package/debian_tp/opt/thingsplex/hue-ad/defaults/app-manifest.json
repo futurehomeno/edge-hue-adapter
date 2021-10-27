@@ -54,10 +54,28 @@
     },
     {
       "id": "discovered_bridges",
-      "label": {"en": "List of discovered bridges"},
+      "label": {
+        "en": "List of discovered bridges"
+      },
       "val_t": "string",
       "ui": {
-        "type": "input_readonly"
+        "type": "input_readonly",
+        "select": null
+      },
+      "val": {
+        "default": ""
+      },
+      "is_required": true,
+      "config_point": "any",
+      "hidden": true
+    },
+    {
+      "id": "discovered_bridges_test",
+      "label": {"en": "Press HUE link button right before connecting to the bridge"},
+      "val_t": "bool",
+      "ui": {
+        "type": "list_radio",
+        "select": null
       },
       "val": {
         "default": ""
@@ -139,11 +157,19 @@
     },
     {
       "id": "settings",
-      "header": {"en": "App settings "},
+      "header": {"en": "App settings"},
       "text": {"en": ""},
       "configs": ["dimmer_range_mode"],
       "buttons": ["sync"],
       "footer": {"en": ""}
+    },
+    {
+      "id": "list",
+      "header": {"en": "List of discovered bridges"},
+      "text": {"en": ""},
+      "configs": ["discovered_bridges_test"],
+      "buttons": ["sync"],
+      "footer": {"en": "Press HUE link button right before connecting to the bridge"}
     }
   ],
   "auth": {

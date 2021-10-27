@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"time"
+
 	"github.com/amimof/huego"
 	"github.com/futurehomeno/fimpgo"
 	"github.com/futurehomeno/fimpgo/discovery"
@@ -10,7 +12,6 @@ import (
 	"github.com/thingsplex/hue-ad/model"
 	"github.com/thingsplex/hue-ad/router"
 	"github.com/thingsplex/hue-ad/utils"
-	"time"
 )
 
 func main() {
@@ -32,7 +33,7 @@ func main() {
 
 	utils.SetupLog(configs.LogFile, configs.LogLevel, configs.LogFormat)
 	log.Info("--------------Starting hue-ad----------------")
-	appLifecycle.SetAppState(model.AppStateStarting,nil)
+	appLifecycle.SetAppState(model.AppStateStarting, nil)
 	mqtt := fimpgo.NewMqttTransport(configs.MqttServerURI, configs.MqttClientIdPrefix, configs.MqttUsername, configs.MqttPassword, true, 1, 1)
 	err = mqtt.Start()
 	responder := discovery.NewServiceDiscoveryResponder(mqtt)
@@ -42,68 +43,74 @@ func main() {
 	b := &huego.Bridge{}
 	bridge = &b
 
-	stateMonitor := router.NewStateMonitor(mqtt,bridge,configs.InstanceAddress)
-    stateMonitor.SetPoolingInterval(configs.StatePoolingInterval)
-	fimpRouter := router.NewFromFimpRouter(mqtt,appLifecycle,configs,bridge,stateMonitor)
+	stateMonitor := router.NewStateMonitor(mqtt, bridge, configs.InstanceAddress)
+	stateMonitor.SetPoolingInterval(configs.StatePoolingInterval)
+	fimpRouter := router.NewFromFimpRouter(mqtt, appLifecycle, configs, bridge, stateMonitor)
 	fimpRouter.Start()
 
 	appLifecycle.SetConnectionState(model.ConnStateDisconnected)
 	if configs.IsConfigured() && err == nil {
 		appLifecycle.SetConfigState(model.ConfigStateConfigured)
-		appLifecycle.SetAppState(model.AppStateRunning,nil)
-	}else {
-		appLifecycle.SetAppState(model.AppStateNotConfigured,nil)
+		appLifecycle.SetAppState(model.AppStateRunning, nil)
+		appLifecycle.SetConnectionState(model.ConnStateConnected)
+	} else {
+		appLifecycle.SetAppState(model.AppStateNotConfigured, nil)
 		appLifecycle.SetConfigState(model.ConfigStateNotConfigured)
+		appLifecycle.SetConnectionState(model.ConnStateDisconnected)
 	}
 
-    var br []huego.Bridge
+	var br []huego.Bridge
 	var retryCounter int
 	for {
 		// At this point application mightn not be configured and the app is waiting for user actions
 		appLifecycle.WaitForState("main", model.AppStateRunning)
-		if appLifecycle.ConnectionState() == model.ConnStateConnected{
+		if appLifecycle.ConnectionState() == model.ConnStateConnected {
 			stateMonitor.Start()
-		}else {
+		} else {
 			retryCounter = 0
 			for {
 				appLifecycle.SetConnectionState(model.ConnStateConnecting)
-				br , err = huego.DiscoverAll()
+				br, err = huego.DiscoverAll()
+				log.Info("DiscoverAll returned br: ", br)
 				if err == nil {
 					break
-				}else {
-					log.Error("Can't discover the bridge. retrying... ",err)
+				} else {
+					log.Error("Can't discover the bridge. retrying... ", err)
 					retryCounter++
 					if retryCounter > 10 {
 						break
 					}
-					time.Sleep(time.Second*5*time.Duration(retryCounter))
+					time.Sleep(time.Second * 5 * time.Duration(retryCounter))
 				}
 			}
 
 			if err == nil {
-				for _,b := range br {
+				for _, b := range br {
 					if b.ID == configs.BridgeId {
+						log.Info("Found b.ID == configs.BridgeId")
+						log.Info("b.ID: ", b.ID)
+						log.Info("configs.BridgeId: ", configs.BridgeId)
 						*bridge = &b
 					}
 				}
 				if (*bridge).ID != "" {
-					log.Infof("Bridge discovered on address = %s , id = %s", (*bridge).Host,(*bridge).ID)
+					log.Info("Bridge discovered on address = %s , id = %s", (*bridge).Host, (*bridge).ID)
 					(*bridge).Login(configs.Token)
 					err = stateMonitor.TestConnection()
 					if err != nil {
 						appLifecycle.SetConnectionState(model.ConnStateDisconnected)
 						appLifecycle.SetLastError(err.Error())
-					}else {
+					} else {
 						appLifecycle.SetConnectionState(model.ConnStateConnected)
 						stateMonitor.Start()
 					}
 
-				}else {
+				} else {
 					log.Info("Adapter is not configured")
-					appLifecycle.SetAppState(model.AppStateNotConfigured,nil)
+					appLifecycle.SetAppState(model.AppStateNotConfigured, nil)
 				}
-			}else {
-				appLifecycle.SetAppState(model.AppStateStartupError,nil)
+			} else {
+				appLifecycle.SetAppState(model.AppStateStartupError, nil)
 			}
 		}
 		appLifecycle.WaitForState("main", model.AppStateNotConfigured)

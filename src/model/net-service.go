@@ -1,13 +1,15 @@
 package model
 
 import (
+	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/amimof/huego"
 	"github.com/futurehomeno/fimpgo"
 	"github.com/futurehomeno/fimpgo/fimptype"
 	log "github.com/sirupsen/logrus"
-	"strconv"
-	"strings"
 )
 
 type ListReportRecord struct {
@@ -18,7 +20,6 @@ type ListReportRecord struct {
 }
 
 type OpResponse struct {
-
 }
 
 type NetworkService struct {
@@ -35,8 +36,8 @@ func (ns *NetworkService) SetDimmerMaxVal(dimmerMaxVal int) {
 	ns.dimmerMaxVal = dimmerMaxVal
 }
 
-func NewNetworkService(mqt *fimpgo.MqttTransport, bridge  **huego.Bridge) *NetworkService {
-	return &NetworkService{mqt: mqt, bridge:bridge, dimmerMaxVal:255}
+func NewNetworkService(mqt *fimpgo.MqttTransport, bridge **huego.Bridge) *NetworkService {
+	return &NetworkService{mqt: mqt, bridge: bridge, dimmerMaxVal: 255}
 }
 
 func (ns *NetworkService) OpenNetwork(open bool) error {
@@ -46,7 +47,7 @@ func (ns *NetworkService) OpenNetwork(open bool) error {
 
 func (ns *NetworkService) DeleteThing(deviceId string) error {
 
-	exclReport := map[string]string{"address":deviceId}
+	exclReport := map[string]string{"address": deviceId}
 	msg := fimpgo.NewMessage("evt.thing.exclusion_report", "conbee", fimpgo.VTypeObject, exclReport, nil, nil, nil)
 	adr := fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeAdapter, ResourceName: "conbee", ResourceAddress: "1"}
 	ns.mqt.Publish(&adr, msg)
@@ -55,28 +56,47 @@ func (ns *NetworkService) DeleteThing(deviceId string) error {
 
 }
 
+func (ns *NetworkService) SendExclusionReport(oldMsg *fimpgo.Message) error {
+	val, err := oldMsg.Payload.GetStrMapValue()
+	if err != nil {
+		log.Error("Wrong msg format")
+		return err
+	}
+
+	deviceID, ok := val["address"]
+	if !ok {
+		return errors.New("could not get address value")
+	}
+	deviceID = strings.Replace(deviceID, "l", "", 1)
+	exclReport := map[string]string{"address": deviceID}
+	msg := fimpgo.NewMessage("evt.thing.exclusion_report", "hue", fimpgo.VTypeObject, exclReport, nil, nil, nil)
+	adr := fimpgo.Address{MsgType: fimpgo.MsgTypeEvt, ResourceType: fimpgo.ResourceTypeAdapter, ResourceName: "hue", ResourceAddress: "1"}
+	ns.mqt.Publish(&adr, msg)
+	log.Debug("Device with deviceID ", deviceID, " excluded.")
+	return nil
+}
+
 func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 	var deviceId int
 	var deviceType string
 	var err error
-	if strings.Contains(nodeId,"l"){
-		nodeId = strings.Replace(nodeId,"l","",1)
-		deviceId , err= strconv.Atoi(nodeId)
+	if strings.Contains(nodeId, "l") {
+		nodeId = strings.Replace(nodeId, "l", "", 1)
+		deviceId, err = strconv.Atoi(nodeId)
 		if err != nil {
 			return err
 		}
 		deviceType = "lights"
-	}else {
-		nodeId = strings.Replace(nodeId,"s","",1)
-		deviceId , err= strconv.Atoi(nodeId)
+	} else {
+		nodeId = strings.Replace(nodeId, "s", "", 1)
+		deviceId, err = strconv.Atoi(nodeId)
 		if err != nil {
 			return err
 		}
 		deviceType = "sensors"
 	}
 
-
-	var productId,name, manufacturer, powerSource, swVersion, serialNr string
+	var productId, name, manufacturer, powerSource, swVersion, serialNr string
 	var deviceAddr string
 	services := []fimptype.Service{}
 
@@ -170,7 +190,7 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 		MsgType:   "cmd.scene.set",
 		ValueType: "string",
 		Version:   "1",
-	},{
+	}, {
 		Type:      "in",
 		MsgType:   "cmd.scene.get_report",
 		ValueType: "null",
@@ -187,7 +207,7 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 		MsgType:   "cmd.color.set",
 		ValueType: "int_map",
 		Version:   "1",
-	},{
+	}, {
 		Type:      "in",
 		MsgType:   "cmd.color.get_report",
 		ValueType: "null",
@@ -198,8 +218,6 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 		ValueType: "int_map",
 		Version:   "1",
 	}}
-
-
 
 	outLvlSwitchService := fimptype.Service{
 		Name:    "out_lvl_switch",
@@ -217,12 +235,12 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 	}
 
 	batteryService := fimptype.Service{
-		Name:    "battery",
-		Alias:   "battery",
-		Address: "/rt:dev/rn:hue/ad:1/sv:battery/ad:",
-		Enabled: true,
-		Groups:  []string{"ch_0"},
-		Props: map[string]interface{}{},
+		Name:             "battery",
+		Alias:            "battery",
+		Address:          "/rt:dev/rn:hue/ad:1/sv:battery/ad:",
+		Enabled:          true,
+		Groups:           []string{"ch_0"},
+		Props:            map[string]interface{}{},
 		Tags:             nil,
 		PropSetReference: "",
 		Interfaces:       batteryInterfaces,
@@ -257,24 +275,24 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 	}
 
 	sceneService := fimptype.Service{
-		Name:    "scene_ctrl",
-		Alias:   "Alert scene",
-		Address: "/rt:dev/rn:hue/ad:1/sv:scene_ctrl/ad:",
-		Enabled: true,
-		Groups:  []string{"ch_0"},
-		Props: map[string]interface{}{"sup_scenes":[]string{"none","select","lselect","colorloop"}},
+		Name:             "scene_ctrl",
+		Alias:            "Alert scene",
+		Address:          "/rt:dev/rn:hue/ad:1/sv:scene_ctrl/ad:",
+		Enabled:          true,
+		Groups:           []string{"ch_0"},
+		Props:            map[string]interface{}{"sup_scenes": []string{"none", "select", "lselect", "colorloop"}},
 		Tags:             nil,
 		PropSetReference: "",
 		Interfaces:       sceneInterfaces,
 	}
 
 	colorService := fimptype.Service{
-		Name:    "color_ctrl",
-		Alias:   "Color control",
-		Address: "/rt:dev/rn:hue/ad:1/sv:color_ctrl/ad:",
-		Enabled: true,
-		Groups:  []string{"ch_0"},
-		Props: map[string]interface{}{"sup_components":[]string{"hue","sat","red","green","blue"}},
+		Name:             "color_ctrl",
+		Alias:            "Color control",
+		Address:          "/rt:dev/rn:hue/ad:1/sv:color_ctrl/ad:",
+		Enabled:          true,
+		Groups:           []string{"ch_0"},
+		Props:            map[string]interface{}{"sup_components": []string{"hue", "sat", "red", "green", "blue"}},
 		Tags:             nil,
 		PropSetReference: "",
 		Interfaces:       colorInterfaces,
@@ -294,63 +312,61 @@ func (ns *NetworkService) SendInclusionReport(nodeId string) error {
 	//}
 
 	presenceService := fimptype.Service{
-		Name:    "sensor_presence",
-		Alias:   "Motion sensor",
-		Address: "/rt:dev/rn:hue/ad:1/sv:sensor_presence/ad:",
-		Enabled: true,
-		Groups:  []string{"ch_0"},
-		Props: map[string]interface{}{},
+		Name:             "sensor_presence",
+		Alias:            "Motion sensor",
+		Address:          "/rt:dev/rn:hue/ad:1/sv:sensor_presence/ad:",
+		Enabled:          true,
+		Groups:           []string{"ch_0"},
+		Props:            map[string]interface{}{},
 		Tags:             nil,
 		PropSetReference: "",
 		Interfaces:       presenceSensorInterfaces,
 	}
 
 	if deviceType == "lights" {
-		    l,_ := (*ns.bridge).GetLight(deviceId)
-			productId = l.ProductID
-			manufacturer = l.ManufacturerName
-			swVersion = l.SwVersion
-			serialNr = l.UniqueID
-			name = l.Name
-			serviceAddres := fmt.Sprintf("l%d_0",deviceId)
-			outLvlSwitchService.Address = outLvlSwitchService.Address + serviceAddres
-			sceneService.Address = sceneService.Address+serviceAddres
-			colorService.Address = colorService.Address+serviceAddres
-			services = append(services,outLvlSwitchService,sceneService,colorService)
-		    deviceAddr = fmt.Sprintf("l%d",deviceId)
-			powerSource = "ac"
-		}else if deviceType == "sensors" {
-			l,_ := (*ns.bridge).GetSensor(deviceId)
-			productId = l.ModelID
-			manufacturer = l.ManufacturerName
-			swVersion = l.SwVersion
-			serialNr = l.UniqueID
-			name = l.Name
-			serviceAddress := fmt.Sprintf("s%d_0",deviceId)
-			batteryService.Address = batteryService.Address+ serviceAddress
-		    services = append(services,batteryService)
-			if l.Type == "ZLLSwitch" {
-				sceneService.Props["sup_scenes"] = []string{}
-				sceneService.Address = sceneService.Address+ serviceAddress
-				services = append(services,sceneService)
-			}
-			if l.Type == "ZLLPresence" {
-				presenceService.Address = presenceService.Address+ serviceAddress
-				services = append(services,presenceService)
-			}
-			if l.Type == "ZLLTemperature" {
-				tempSensorService.Address = tempSensorService.Address+ serviceAddress
-				services = append(services,tempSensorService)
-			}
-			if l.Type == "ZLLLightLevel" {
-				luminSensorService.Address = luminSensorService.Address+ serviceAddress
-				services = append(services,luminSensorService)
-			}
-			deviceAddr = fmt.Sprintf("s%d",deviceId)
-			powerSource = "battery"
+		l, _ := (*ns.bridge).GetLight(deviceId)
+		productId = l.ProductID
+		manufacturer = l.ManufacturerName
+		swVersion = l.SwVersion
+		serialNr = l.UniqueID
+		name = l.Name
+		serviceAddres := fmt.Sprintf("l%d_0", deviceId)
+		outLvlSwitchService.Address = outLvlSwitchService.Address + serviceAddres
+		sceneService.Address = sceneService.Address + serviceAddres
+		colorService.Address = colorService.Address + serviceAddres
+		services = append(services, outLvlSwitchService, sceneService, colorService)
+		deviceAddr = fmt.Sprintf("l%d", deviceId)
+		powerSource = "ac"
+	} else if deviceType == "sensors" {
+		l, _ := (*ns.bridge).GetSensor(deviceId)
+		productId = l.ModelID
+		manufacturer = l.ManufacturerName
+		swVersion = l.SwVersion
+		serialNr = l.UniqueID
+		name = l.Name
+		serviceAddress := fmt.Sprintf("s%d_0", deviceId)
+		batteryService.Address = batteryService.Address + serviceAddress
+		services = append(services, batteryService)
+		if l.Type == "ZLLSwitch" {
+			sceneService.Props["sup_scenes"] = []string{}
+			sceneService.Address = sceneService.Address + serviceAddress
+			services = append(services, sceneService)
 		}
-
-
+		if l.Type == "ZLLPresence" {
+			presenceService.Address = presenceService.Address + serviceAddress
+			services = append(services, presenceService)
+		}
+		if l.Type == "ZLLTemperature" {
+			tempSensorService.Address = tempSensorService.Address + serviceAddress
+			services = append(services, tempSensorService)
+		}
+		if l.Type == "ZLLLightLevel" {
+			luminSensorService.Address = luminSensorService.Address + serviceAddress
+			services = append(services, luminSensorService)
+		}
+		deviceAddr = fmt.Sprintf("s%d", deviceId)
+		powerSource = "battery"
+	}
 
 	//}
 	//if deviceType == "sensors" {
@@ -425,18 +441,18 @@ func (ns *NetworkService) SendListOfDevices() error {
 
 	report := []ListReportRecord{}
 
-	lights,_ := (*ns.bridge).GetLights()
-	for _,l := range lights {
-		rec := ListReportRecord{Address:fmt.Sprintf("l%d",l.ID) ,Alias:l.ManufacturerName+" "+l.ModelID+" "+l.Name}
-		report = append(report,rec)
+	lights, _ := (*ns.bridge).GetLights()
+	for _, l := range lights {
+		rec := ListReportRecord{Address: fmt.Sprintf("l%d", l.ID), Alias: l.ManufacturerName + " " + l.ModelID + " " + l.Name}
+		report = append(report, rec)
 	}
-	sensors,_ := (*ns.bridge).GetSensors()
-	for _,s := range sensors {
+	sensors, _ := (*ns.bridge).GetSensors()
+	for _, s := range sensors {
 		if s.Type == "ZLLPresence" || s.Type == "ZLLTemperature" || s.Type == "ZLLLightLevel" || s.Type == "ZLLSwitch" {
-			rec := ListReportRecord{Address:fmt.Sprintf("s%d",s.ID),Alias:" "+s.ManufacturerName+" "+s.ModelID+" "+s.Name}
-			report = append(report,rec)
-		}else {
-			log.Debugf("Unsupported type %s , id = %d",s.Type,s.ID)
+			rec := ListReportRecord{Address: fmt.Sprintf("s%d", s.ID), Alias: " " + s.ManufacturerName + " " + s.ModelID + " " + s.Name}
+			report = append(report, rec)
+		} else {
+			log.Debugf("Unsupported type %s , id = %d", s.Type, s.ID)
 		}
 
 	}
@@ -451,9 +467,9 @@ func (ns *NetworkService) SendListOfDevices() error {
 	//
 	//}
 
-	rules,_ := (*ns.bridge).GetRules()
-	for _,sc := range rules {
-		log.Debugf("Rule %s , %s",sc.Name)
+	rules, _ := (*ns.bridge).GetRules()
+	for _, sc := range rules {
+		log.Debugf("Rule %s , %s", sc.Name)
 	}
 
 	msg := fimpgo.NewMessage("evt.network.all_nodes_report", "hue", fimpgo.VTypeObject, report, nil, nil, nil)
