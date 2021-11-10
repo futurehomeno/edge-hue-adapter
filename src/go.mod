@@ -1,4 +1,4 @@
-module github.com/thingsplex/hue-ad
+module github.com/futurehomeno/edge-hue-adapter
 
 require (
 	github.com/BurntSushi/toml v0.3.1 // indirect

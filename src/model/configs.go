@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/futurehomeno/edge-hue-adapter/utils"
 	log "github.com/sirupsen/logrus"
-	"github.com/thingsplex/hue-ad/utils"
 )
 
 type Configs struct {

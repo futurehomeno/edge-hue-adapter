@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/amimof/huego"
+	"github.com/futurehomeno/edge-hue-adapter/model"
+	"github.com/futurehomeno/edge-hue-adapter/router"
+	"github.com/futurehomeno/edge-hue-adapter/utils"
 	"github.com/futurehomeno/fimpgo"
 	"github.com/futurehomeno/fimpgo/discovery"
 	log "github.com/sirupsen/logrus"
-	"github.com/thingsplex/hue-ad/model"
-	"github.com/thingsplex/hue-ad/router"
-	"github.com/thingsplex/hue-ad/utils"
 )
 
 func main() {
