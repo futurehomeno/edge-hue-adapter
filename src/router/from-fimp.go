@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/amimof/huego"
+	"github.com/futurehomeno/edge-hue-adapter/model"
 	"github.com/futurehomeno/fimpgo"
 	"github.com/lucasb-eyer/go-colorful"
 	log "github.com/sirupsen/logrus"
-	"github.com/thingsplex/hue-ad/model"
 )
 
 const ServiceName = "hue"
