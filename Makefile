@@ -1,61 +1,65 @@
-version_file=VERSION
+version="0.0.1"
+version_file=package/debian/opt/thingsplex/$(app_name)/VERSION
 working_dir=$(shell pwd)
-arch="armhf"
-version:=`git describe --tags | cut -c 2-`
-remote_host = "fh@cube.local"
+app_name=hue
+remote_host = "fhtunnel@52.58.200.103"
+remote_port = "8000"
 
 clean:
-	-rm ./src/hue-ad
-
-init:
-	git config core.hooksPath .githooks
+	-rm ./src/$(app_name)
+	-rm ./package/debian/opt/thingsplex/$(app_name)/$(app_name)
+	find package/debian -name ".DS_Store" -delete
 
 build-go:
-	cd ./src;go build -o hue-ad service.go;cd ../
+	cd ./src; go build -o $(app_name) main.go; cd ../
 
-build-go-arm: init
-	cd ./src;GOOS=linux GOARCH=arm GOARM=6 go build -ldflags="-s -w" -o hue-ad service.go;cd ../
+build-go-arm:
+	cd ./src; GOOS=linux GOARCH=arm GOARM=6 go build -ldflags="-s -w" -o $(app_name) main.go; cd ../
 
-build-go-amd: init
-	cd ./src;GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o hue-ad service.go;cd ../
-
+build-go-amd:
+	cd ./src; GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o $(app_name) main.go; cd ../
 
 configure-arm:
-	python ./scripts/config_env.py prod $(version) armhf
+	sed -i.bak "1s/.*/$(version)/" $(version_file)
+	rm $(version_file).bak
+	sed -i.bak "s/Version: .*/Version: $(version)/" package/debian/DEBIAN/control
+	sed -i.bak "s/Architecture: .*/Architecture: armhf/" package/debian/DEBIAN/control
+	rm package/debian/DEBIAN/control.bak
 
 configure-amd64:
-	python ./scripts/config_env.py prod $(version) amd64
+	sed -i.bak "1s/.*/$(version)/" $(version_file)
+	rm $(version_file).bak
+	sed -i.bak "s/Version: .*/Version: $(version)/" package/debian/DEBIAN/control
+	sed -i.bak "s/Architecture: .*/Architecture: amd64/" package/debian/DEBIAN/control
+	rm package/debian/DEBIAN/control.bak
 
-
-package-tar:
-	tar cvzf hue-ad_$(version).tar.gz hue-ad $(version_file)
-
-package-deb-doc-tp:
-	@echo "Packaging application as Thingsplex debian package"
-	chmod a+x package/debian_tp/DEBIAN/*
-	mkdir -p package/debian_tp/var/log/thingsplex/hue-ad package/debian_tp/usr/bin
-	mkdir -p package/build
-	cp ./src/hue-ad package/debian_tp/opt/thingsplex/hue-ad
-	cp VERSION package/debian_tp/opt/thingsplex/hue-ad
-	docker run --rm -v ${working_dir}:/build -w /build --name debuild debian dpkg-deb --build package/debian_tp
+package-deb-docker:
+	@echo "Packaging application using Thingsplex debian package layout..."
+	mkdir -p package/debian/var/log/thingsplex/$(app_name)
+	mkdir -p package/debian/opt/thingsplex/$(app_name)/data
+	chmod -R 755 package/debian
+	chmod 644 package/debian/opt/thingsplex/$(app_name)/defaults/*
+	chmod 644 package/debian/opt/thingsplex/$(app_name)/VERSION
+	cp ./src/$(app_name) package/debian/opt/thingsplex/$(app_name)
+	docker run --rm -v ${working_dir}:/build -w /build --name debuild debian dpkg-deb --build package/debian
 	@echo "Done"
 
+deb-arm: clean configure-arm build-go-arm package-deb-docker
+	mv package/debian.deb package/build/$(app_name)_$(version)_armhf.deb
 
-deb-arm : clean configure-arm build-go-arm package-deb-doc-tp
-	mv package/debian_tp.deb package/build/hue-ad_$(version)_armhf.deb
+deb-amd: clean configure-amd64 build-go-amd package-deb-docker
+	mv package/debian.deb package/build/$(app_name)_$(version)_amd64.deb
 
-deb-amd : configure-amd64 build-go-amd package-deb-doc-tp
-	mv debian.deb package/build/hue-ad_$(version)_amd64.deb
+upload:
+	scp -P ${remote_port} package/build/$(app_name)_$(version)_armhf.deb $(remote_host):~/
 
-upload :
-	scp package/build/hue-ad_$(version)_armhf.deb $(remote_host):~/
+run: build-go
+	cd ./testdata; ../src/$(app_name) -c ./; cd ../
 
-remote-install : upload
-	ssh -t $(remote_host) "sudo dpkg -i hue-ad_$(version)_armhf.deb"
+lint:
+	cd src; golangci-lint run; cd ..
 
-deb-remote-install : deb-arm remote-install
-	@echo "Installed"
-run :
-	cd ./src; go run service.go -c testdata;cd ../
+test:
+	cd src; go test; cd ..
 
 .phony : clean

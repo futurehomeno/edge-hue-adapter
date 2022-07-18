@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+	remove)
+		# Stop system service if it is running.
+		deb-systemd-invoke stop hue.service > /dev/null
+		# Disable system service so it won't be automatically started.
+		deb-systemd-helper disable hue.service >/dev/null
+		# Purge information about the service from the helper.
+		deb-systemd-helper purge hue.service >/dev/null
+	;;
+
+	upgrade|failed-upgrade|deconfigure)
+	;;
+
+	*)
+		echo "prerm called with an unknown argument \`$1'" >&2
+		exit 1
+	;;
+esac
+
+exit 0

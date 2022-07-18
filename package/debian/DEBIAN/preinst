@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+	upgrade)
+		# Record current state of the service.
+		deb-systemd-helper mask hue.service >/dev/null
+		# Stop system service.
+		deb-systemd-invoke stop hue.service > /dev/null
+		# Disable system service.
+		deb-systemd-helper disable hue.service >/dev/null
+	;;
+
+	install|abort-upgrade)
+	;;
+
+	*)
+		echo "preinst called with an unknown argument \`$1'" >&2
+		exit 1
+	;;
+esac
+
+exit 0

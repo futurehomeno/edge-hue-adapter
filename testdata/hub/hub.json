@@ -1,0 +1,8 @@
+{
+  "hub_id": "020000000012345678",
+  "site_id": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+  "site_name": "",
+  "site_type": "",
+  "environment": "beta",
+  "cloud_api_root_url": "https://v3-beta.futurehome.io"
+}

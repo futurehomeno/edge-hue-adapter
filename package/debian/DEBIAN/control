@@ -1,0 +1,8 @@
+Package: hue
+Version: 0.0.1
+Replaces: hue
+Section: non-free/misc
+Priority: optional
+Architecture: armhf
+Maintainer: Futurehome AS <support@futurehome.no>
+Description: Futurehome Philips Hue adapter

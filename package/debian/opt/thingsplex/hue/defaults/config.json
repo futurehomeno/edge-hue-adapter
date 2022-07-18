@@ -1,0 +1,10 @@
+{
+  "mqtt_server_uri": "tcp://localhost:1883",
+  "mqtt_client_id_prefix": "hue",
+  "mqtt_server_username": "",
+  "mqtt_server_password": "",
+  "info_file": "/var/lib/futurehome/hub/hub.json",
+  "log_file": "/var/log/thingsplex/hue/hue.log",
+  "log_level": "debug",
+  "log_format": "text"
+}

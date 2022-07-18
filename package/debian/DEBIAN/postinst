@@ -1,0 +1,71 @@
+#!/bin/bash
+set -e
+
+add_user_and_group() {
+	if ! getent group thingsplex >/dev/null
+	then
+		echo -n "Adding group thingsplex..."
+		addgroup --quiet \
+			--system \
+			thingsplex 2>/dev/null || true
+		echo "...OK"
+	fi
+
+	if ! getent passwd hue >/dev/null
+	then
+		echo -n "Adding user hue..."
+		adduser --quiet \
+			--system \
+			--ingroup thingsplex \
+			--no-create-home \
+			--disabled-password \
+			hue 2>/dev/null || true
+		echo "...OK"
+	fi
+}
+
+create_dirs_and_files() {
+	# Create required directories and files.
+	mkdir -p /opt/thingsplex/hue/data
+	mkdir -p /var/log/thingsplex/hue
+	touch /var/log/thingsplex/hue/hue.log
+}
+
+set_ownership() {
+	# Set proper ownership and rights for files.
+	chown -R hue:thingsplex /opt/thingsplex/hue || true
+	chown -R hue:thingsplex /var/log/thingsplex/hue || true
+	chmod -R 644 /var/log/thingsplex/hue || true
+	chmod -R 644 /opt/thingsplex/hue/defaults || true
+}
+
+configure_service() {
+		# Revert service to the previously recorded state.
+		deb-systemd-helper unmask hue.service >/dev/null
+		# Enable service on the first installation.
+		deb-systemd-helper enable hue.service >/dev/null
+		# Start service if it is enabled.
+		if deb-systemd-helper --quiet is-enabled hue.service; then
+			deb-systemd-invoke start hue.service > /dev/null
+		fi
+}
+
+case "$1" in
+	configure)
+	  echo "Configuring..."
+		add_user_and_group
+		create_dirs_and_files
+		set_ownership
+		configure_service
+	;;
+
+	abort-upgrade|abort-remove|abort-deconfigure)
+	;;
+
+	*)
+		echo "postinst called with an unknown argument \`$1'" >&2
+		exit 1
+	;;
+esac
+
+exit 0

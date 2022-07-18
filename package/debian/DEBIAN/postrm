@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+	remove|purge)
+		# Remove all service logs.
+		rm /var/log/thingsplex/hue/* || true
+		# Remove all package data files.
+		rm /opt/thingsplex/hue/data/* || true
+	;;
+
+	upgrade|abort-upgrade|abort-install|failed-upgrade|disappear)
+	;;
+
+	*)
+		echo "postrm called with an unknown argument \`$1'" >&2
+		exit 1
+	;;
+esac
+
+exit 0

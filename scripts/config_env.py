@@ -7,7 +7,7 @@ def set_deb_control(version , arch,file_name):
     template+= "Section: non-free/misc\n"
     template+= "Priority: optional\n"
     template+= "Architecture: "+arch+"\n"
-    template+= "Maintainer: Aleksandrs Livincovs <aleksandrs.livincovs@gmail.com>\n"
+    template+= "Maintainer: Markus Haldorsen <markus@futurehome.no>\n"
     template+= "Description: Philips Hue adapter for futurehome system .\n"
 
     f = open(file_name,"w")

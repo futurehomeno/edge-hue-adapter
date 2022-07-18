@@ -1,0 +1,14 @@
+[Unit]
+Description=Futurehome Philips Hue adapter
+
+[Service]
+Type=simple
+ExecStart=/opt/thingsplex/hue/hue
+User=hue
+WorkingDirectory=/opt/thingsplex/hue
+Restart=always
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target
